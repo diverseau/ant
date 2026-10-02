@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename, extname, join, normalize, resolve } from 'node:path'
 import { insideFolder } from '../rules/engine.ts'
+import { antDataDir } from '../config.ts'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createNodeWebSocket } from '@hono/node-ws'
@@ -320,6 +321,15 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
       'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
     })
+  })
+
+  app.get('/api/ants/:id/snapshots/:msg', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const msg = c.req.param('msg').replace(/\.jpg$/, '')
+    if (!/^[\w-]+$/.test(msg)) throw new HttpError(400, 'Bad id')
+    const file = join(antDataDir(svc.cfg, id), 'snapshots', `${msg}.jpg`)
+    if (!existsSync(file)) throw new HttpError(404, 'No snapshot')
+    return c.body(readFileSync(file), 200, { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=31536000, immutable' })
   })
 
   app.get('/api/usage', (c) => {

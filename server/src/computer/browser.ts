@@ -191,6 +191,9 @@ export class AntBrowser {
     this.listeners.add(l)
     if (this.listeners.size === 1) await this.startScreencast()
     l.state(this.state())
+    // The screencast only sends frames on repaint; give a new viewer the current picture now.
+    const now = await this.screenshot()
+    if (now) l.frame({ data: now, width: this.size.width, height: this.size.height })
     return () => {
       this.listeners.delete(l)
       if (!this.listeners.size && this.session) void this.send('Page.stopScreencast', {}, this.session.sessionId).catch(() => {})

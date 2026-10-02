@@ -29,6 +29,8 @@ export function describeTool(name: string, input: unknown, folder?: string): Des
     case 'Bash':
       return { title: s('description') || 'Ran a command', detail: clip(s('command'), 400), connector: 'Terminal' }
     case 'Read':
+      // Claude Code saves large tool output under ~/.claude/projects and reads it back.
+      if (/\/\.claude\/projects\//.test(s('file_path'))) return { title: 'Read saved tool output', connector: 'Files' }
       return { title: `Read ${shortPath(s('file_path'), folder)}`, connector: 'Files' }
     case 'Write':
       return { title: `Wrote ${shortPath(s('file_path'), folder)}`, detail: clip(s('content'), 200), connector: 'Files' }

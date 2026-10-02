@@ -54,6 +54,8 @@ export interface ComputerMessage extends Base {
   text: string
   state: 'working' | 'needs-you' | 'done'
   site: string
+  /** A screenshot was saved when the turn ended (live mode). */
+  snapshot?: boolean
 }
 
 export interface ChecklistMessage extends Base {

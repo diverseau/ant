@@ -5,7 +5,8 @@ import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, UsageWindows } 
 import { LoopGuard } from './colony/loop-guard.ts'
 import { ComputerManager } from './computer/manager.ts'
 import type { Registry } from './connectors/registry.ts'
-import type { Config } from './config.ts'
+import { antDataDir, type Config } from './config.ts'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import type { Db } from './db/index.ts'
 import * as R from './db/repos/index.ts'
 import { toAnt, toColony, toMessage, toThread, toThreadSummary } from './mappers.ts'
@@ -44,6 +45,8 @@ interface Live {
   texts: Map<string, { id: string; threadId: string; text: string }>
   tools: Map<string, { messageId: string; threadId: string; startedAt: number; dbId: string }>
   lastText: string
+  /** This turn's Computer card, created on first browser use. */
+  computerCard: string | null
 }
 
 const PRIORITY: Record<TurnSource, number> = { user: 0, system: 1, ant: 2, routine: 3 }
@@ -402,6 +405,7 @@ export class AntService {
       texts: new Map(),
       tools: new Map(),
       lastText: '',
+      computerCard: null,
       proc: null as unknown as AntProcess,
     }
     live.proc = new AntProcess(
@@ -491,6 +495,7 @@ export class AntService {
       case 'tool.start': {
         if (e.parentToolUseId || isQuietTool(e.name)) break
         const d = describeTool(e.name, e.input, l.paths.folder)
+        if (e.name.startsWith('mcp__browser__')) this.computerActivity(antId, l, threadId, d.title, e.input)
         const m = this.insert(threadId, antId, 'tool', { toolUseId: e.toolUseId, name: e.name, title: d.title, detail: d.detail, state: 'running' }, '', l.runId)
         const ev = l.runId ? R.addToolEvent(this.db, { runId: l.runId, toolUseId: e.toolUseId, name: e.name, input: e.input, status: 'running' }) : null
         l.tools.set(e.toolUseId, { messageId: m.id, threadId, startedAt: Date.now(), dbId: ev?.id ?? '' })
@@ -542,8 +547,32 @@ export class AntService {
     }
   }
 
+  /** Grok Bot-style Computer card: one per turn, live while the ant browses. */
+  private computerActivity(antId: string, l: Live, threadId: string, title: string, input: unknown) {
+    const url = (input as { url?: unknown })?.url
+    const site = typeof url === 'string' ? url.replace(/^https?:\/\//, '').slice(0, 80) : undefined
+    if (!l.computerCard) {
+      l.computerCard = this.insert(threadId, antId, 'computer', { title: 'Computer', text: title, state: 'working', site: site ?? '' }, '', l.runId).id
+    } else this.patch(l.computerCard, { text: title, ...(site && { site }) })
+  }
+
+  private async closeComputerCard(antId: string, cardId: string) {
+    const snap = await this.computers.thumbnail(antId).catch(() => null)
+    if (snap) {
+      const dir = `${antDataDir(this.cfg, antId)}/snapshots`
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(`${dir}/${cardId}.jpg`, Buffer.from(snap, 'base64'))
+    }
+    const state = this.computers.state(antId)
+    this.patch(cardId, { state: 'done', ...(snap && { snapshot: true }), ...(state.url && state.url !== 'about:blank' && { site: state.url.replace(/^https?:\/\//, '').slice(0, 80) }) })
+  }
+
   private finishTurn(antId: string, l: Live, ok: boolean, error?: string) {
     const turn = l.current
+    if (l.computerCard) {
+      void this.closeComputerCard(antId, l.computerCard)
+      l.computerCard = null
+    }
     // Close anything left open (interrupts leave tools and text dangling).
     for (const t of l.tools.values()) this.patch(t.messageId, { state: 'error', detail: 'Stopped' })
     l.tools.clear()

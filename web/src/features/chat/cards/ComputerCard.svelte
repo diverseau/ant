@@ -3,6 +3,7 @@
   import { app } from '../../../lib/store.svelte'
   import type { ComputerMessage } from '../../../lib/types'
   import FakeScreen from '../../computer/FakeScreen.svelte'
+  import LiveScreen from '../../computer/LiveScreen.svelte'
   import StatusPill from './StatusPill.svelte'
 
   let { m }: { m: ComputerMessage } = $props()
@@ -15,7 +16,15 @@
   </div>
   <p class="text">{m.text}</p>
   <button class="thumb" onclick={() => (app.panel = 'computer')} aria-label="Open computer">
-    <FakeScreen site={m.site} live={m.state === 'working'} />
+    {#if app.mode !== 'live'}
+      <FakeScreen site={m.site} live={m.state === 'working'} />
+    {:else if m.state === 'working'}
+      <LiveScreen antId={m.author} control={false} />
+    {:else if m.snapshot}
+      <img class="snap" src="/api/ants/{m.author}/snapshots/{m.id}.jpg" alt="Last view of {m.site}" loading="lazy" />
+    {:else}
+      <div class="snap empty">{m.site || 'Browser'}</div>
+    {/if}
     <span class="open"><Maximize size={13} /> Open computer</span>
   </button>
 </div>
@@ -57,6 +66,23 @@
 
   .thumb:hover {
     transform: scale(1.012);
+  }
+
+  .snap {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    border-radius: var(--r-md);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+
+  .snap.empty {
+    display: grid;
+    place-items: center;
+    background: #0e0e0e;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
   }
 
   .open {
