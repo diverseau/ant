@@ -136,6 +136,35 @@ server.registerTool(
 )
 
 server.registerTool(
+  'schedule_routine',
+  {
+    description:
+      'Save a routine: work you will do automatically on a schedule (or when a webhook is called), even when the user is away. "when" accepts plain language or cron, e.g. "every weekday at 9am", "every 2 hours", "mondays at 14:00", "in 30m", "0 9 * * 1-5". Minimum interval 5 minutes. Confirm the schedule back to the user. It does not run immediately.',
+    inputSchema: {
+      name: z.string().max(80),
+      instruction: z.string().describe('What to do each run, written as a self-contained task, including where to report results and what needs approval'),
+      when: z.string().default(''),
+      tz: z.string().optional().describe('IANA time zone; defaults to the user setting'),
+      webhook: z.boolean().optional().describe('Trigger by HTTP webhook instead of a schedule'),
+    },
+  },
+  (args) => call('schedule_routine', args),
+)
+
+server.registerTool('list_routines', { description: 'List your routines.', inputSchema: {} }, () => call('list_routines', {}))
+
+server.registerTool(
+  'edit_routine',
+  {
+    description: 'Change one of your routines by name: its instruction, its schedule, or pause/resume it (enabled).',
+    inputSchema: { name: z.string(), instruction: z.string().optional(), when: z.string().optional(), enabled: z.boolean().optional() },
+  },
+  (args) => call('edit_routine', args),
+)
+
+server.registerTool('delete_routine', { description: 'Delete one of your routines by name.', inputSchema: { name: z.string() } }, (args) => call('delete_routine', args))
+
+server.registerTool(
   'share_file',
   { description: 'Show a file from your folder to the user as a file card in chat.', inputSchema: { path: z.string() } },
   (args) => call('share_file', args),

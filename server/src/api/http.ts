@@ -7,6 +7,7 @@ import type { AntEvent, ApprovalDecision, CreateAntInput, Health } from '@ant/sh
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { Broker } from '../broker.ts'
+import type { Scheduler } from '../scheduler/runtime.ts'
 import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
@@ -26,7 +27,7 @@ const createAnt = z.object({
 })
 const patchAnt = createAnt.partial().extend({ status: z.enum(['idle', 'paused']).optional() })
 
-export function startHttp(svc: AntService, broker: Broker, health: () => Health) {
+export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler, health: () => Health) {
   const app = new Hono()
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
 
@@ -158,6 +159,64 @@ export function startHttp(svc: AntService, broker: Broker, health: () => Health)
       }
     }),
   )
+
+  // Routines
+  app.get('/api/routines', (c) => c.json(scheduler.list(c.req.query('antId'))))
+  app.post('/api/routines', async (c) => {
+    const b = await body(
+      c,
+      z.object({
+        antId: z.string(),
+        name: z.string().min(1).max(80),
+        instruction: z.string().min(1).max(8000),
+        when: z.string().max(200).default(''),
+        tz: z.string().optional(),
+        trigger: z.enum(['schedule', 'webhook']).optional(),
+      }),
+    )
+    return c.json(scheduler.create(b), 201)
+  })
+  app.patch('/api/routines/:id', async (c) => {
+    const b = await body(
+      c,
+      z.object({ name: z.string().min(1).max(80).optional(), instruction: z.string().min(1).max(8000).optional(), when: z.string().max(200).optional(), tz: z.string().optional(), enabled: z.boolean().optional() }),
+    )
+    return c.json(scheduler.update(c.req.param('id'), b))
+  })
+  app.delete('/api/routines/:id', (c) => {
+    scheduler.delete(c.req.param('id'))
+    return c.body(null, 204)
+  })
+  app.post('/api/routines/:id/test', (c) => {
+    scheduler.fire(scheduler.get(c.req.param('id')), { trigger: 'test' })
+    return c.body(null, 202)
+  })
+  app.get('/api/routines/:id/runs', (c) => c.json(scheduler.runs(scheduler.get(c.req.param('id')).id)))
+  app.put('/api/settings/timezone', async (c) => {
+    const b = await body(c, z.object({ timezone: z.string().min(1) }))
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: b.timezone })
+    } catch {
+      throw new HttpError(400, 'Unknown time zone')
+    }
+    R.setSetting(svc.db, 'timezone', b.timezone)
+    return c.body(null, 204)
+  })
+
+  // Webhook trigger: 202 means the run started, not that it finished (Grok Bot semantics).
+  app.post('/hooks/:id', async (c) => {
+    const r = scheduler.verifyWebhook(c.req.param('id'), c.req.header('authorization'))
+    const raw = await c.req.text()
+    if (raw.length > 64_000) throw new HttpError(413, 'Payload too large')
+    let payload: unknown = raw
+    try {
+      payload = raw ? JSON.parse(raw) : undefined
+    } catch {
+      // keep as text
+    }
+    scheduler.fire(r, { trigger: 'webhook', payload })
+    return c.json({ started: true }, 202)
+  })
 
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)

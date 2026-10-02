@@ -7,6 +7,7 @@ import { Broker } from './broker.ts'
 import { loadConfig } from './config.ts'
 import { openDb } from './db/index.ts'
 import { IpcServer } from './ipc.ts'
+import { Scheduler } from './scheduler/runtime.ts'
 import { AntService } from './service.ts'
 import { registerTools } from './tools.ts'
 
@@ -18,7 +19,9 @@ const db = openDb(cfg.dbPath)
 const ipc = new IpcServer(cfg.socketPath)
 const svc = new AntService(db, cfg, ipc)
 const broker = new Broker(svc)
-registerTools(svc, broker)
+const scheduler = new Scheduler(svc)
+svc.routineViews = () => scheduler.list()
+registerTools(svc, broker, scheduler)
 
 function which(bin: string): boolean {
   try {
@@ -56,10 +59,11 @@ function health(): Health {
 }
 
 await ipc.listen()
-const server = startHttp(svc, broker, health)
+const server = startHttp(svc, broker, scheduler, health)
 console.log(`antd ${cfg.version} on http://${cfg.host}:${cfg.port} · ants in ${cfg.antHome}`)
 
 function shutdown() {
+  scheduler.shutdown()
   svc.shutdown()
   broker.shutdown()
   ipc.close()

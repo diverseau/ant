@@ -4,6 +4,7 @@ import { existsSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { MemoryStore } from './memory/store.ts'
 import type { Broker } from './broker.ts'
+import type { Scheduler } from './scheduler/runtime.ts'
 import * as R from './db/repos/index.ts'
 import { toAnt } from './mappers.ts'
 import { insideFolder } from './rules/engine.ts'
@@ -13,7 +14,7 @@ import { evaluateFloors } from './rules/floors.ts'
 type P = Record<string, unknown>
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
-export function registerTools(svc: AntService, broker: Broker) {
+export function registerTools(svc: AntService, broker: Broker, scheduler: Scheduler) {
   const ipc = svc.ipc
 
   ipc.on('permission', (antId, p) => broker.permission(antId, p as { tool_name?: string; input?: unknown }))
@@ -61,6 +62,42 @@ export function registerTools(svc: AntService, broker: Broker) {
   ipc.on('post_to_colony', (antId, p) => svc.postToColony(antId, str(p.colony), str(p.text)))
 
   ipc.on('memory', (antId, p) => memory(svc, antId, p))
+
+  // Routines (plan §8): created by asking the ant in chat.
+  const routineErr = (err: unknown) => `Not saved: ${err instanceof Error ? err.message : String(err)}`
+  ipc.on('schedule_routine', (antId, p) => {
+    try {
+      const { routine, key } = scheduler.create({ antId, name: str(p.name), instruction: str(p.instruction), when: str(p.when), tz: str(p.tz) || undefined, trigger: p.webhook ? 'webhook' : 'schedule' })
+      if (key) return `Saved webhook routine "${routine.name}". POST to ${routine.webhookUrl} with header "Authorization: Bearer ${key}" (shown once; tell the user to store it). JSON bodies are passed to you.`
+      return `Saved routine "${routine.name}": ${routine.when}. Next run ${routine.nextRunAt ? new Date(routine.nextRunAt).toLocaleString('en-AU', { timeZone: routine.tz }) : 'never'}. It doesn't run now; the user can press Test to try it.`
+    } catch (err) {
+      return routineErr(err)
+    }
+  })
+  ipc.on('list_routines', (antId) => {
+    const list = scheduler.list(antId)
+    return list.length ? list.map((r) => `- ${r.name} · ${r.enabled ? 'active' : 'paused'} · ${r.when} · ${r.instruction.slice(0, 100)}`).join('\n') : 'No routines yet.'
+  })
+  ipc.on('edit_routine', (antId, p) => {
+    const r = scheduler.findByName(antId, str(p.name))
+    if (!r) return `You have no routine called ${str(p.name)}.`
+    try {
+      const v = scheduler.update(r.id, {
+        ...(p.instruction !== undefined && { instruction: str(p.instruction) }),
+        ...(p.when !== undefined && { when: str(p.when) }),
+        ...(p.enabled !== undefined && { enabled: p.enabled === true }),
+      })
+      return `Updated "${v.name}": ${v.enabled ? v.when : 'paused'}.`
+    } catch (err) {
+      return routineErr(err)
+    }
+  })
+  ipc.on('delete_routine', (antId, p) => {
+    const r = scheduler.findByName(antId, str(p.name))
+    if (!r) return `You have no routine called ${str(p.name)}.`
+    scheduler.delete(r.id)
+    return `Deleted "${r.name}".`
+  })
 
   ipc.on('share_file', (antId, p) => {
     const folder = svc.pathsFor(antId).folder

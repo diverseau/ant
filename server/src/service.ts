@@ -26,6 +26,8 @@ export interface Turn {
   fromAntId?: string
   depth: number
   enqueuedAt: number
+  /** Set when this turn is a routine run (see scheduler/runtime.ts). */
+  routineRunId?: string
 }
 
 interface Live {
@@ -75,6 +77,9 @@ export class AntService {
 
   /* ---------------- reads ---------------- */
 
+  /** Filled in by main.ts once the scheduler exists. */
+  routineViews: () => Bootstrap['routines'] = () => []
+
   bootstrap(health: Bootstrap['health']): Bootstrap {
     const threads = R.listThreads(this.db).map((t) => toThread(t, R.listMessages(this.db, t.id, { limit: 80 })))
     return {
@@ -84,6 +89,8 @@ export class AntService {
       threads,
       usage: R.getSetting<UsageWindows | null>(this.db, 'usage.windows', null),
       health,
+      routines: this.routineViews(),
+      settings: { timezone: R.getSetting(this.db, 'timezone', Intl.DateTimeFormat().resolvedOptions().timeZone) },
     }
   }
 
@@ -496,7 +503,10 @@ export class AntService {
     l.current = null
     this.activity.delete(antId)
     if (error && turn) this.insert(turn.threadId, antId, 'error', { detail: error }, 'This ant stopped unexpectedly.')
-    if (turn) this.emit({ type: 'typing', threadId: turn.threadId, antId: null })
+    if (turn) {
+      this.emit({ type: 'typing', threadId: turn.threadId, antId: null })
+      this.bus.emit('turn.finished', { antId, turn, ok, text: l.lastText })
+    }
     const pending = R.listApprovals(this.db, { status: 'pending', antId }).length
     const row = R.getAnt(this.db, antId)
     if (row && row.status !== 'paused') this.setStatus(antId, pending ? 'attention' : 'idle')

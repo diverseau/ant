@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import type { AntEvent } from '@ant/shared'
+import { Scheduler } from '../../src/scheduler/runtime.ts'
 import { Broker } from '../../src/broker.ts'
 import { loadConfig } from '../../src/config.ts'
 import { openDb } from '../../src/db/index.ts'
@@ -71,7 +72,8 @@ export async function createHarness(maxBusy = 3) {
   const ipc = new IpcServer(cfg.socketPath)
   const svc = new AntService(db, cfg, ipc)
   const broker = new Broker(svc)
-  registerTools(svc, broker)
+  const scheduler = new Scheduler(svc)
+  registerTools(svc, broker, scheduler)
   const events: AntEvent[] = []
   svc.bus.on('event', (event: AntEvent) => events.push(event))
   await ipc.listen()
@@ -90,6 +92,7 @@ export async function createHarness(maxBusy = 3) {
   async function close() {
     const processes = R.listAnts(db).map((a) => svc.liveProcess(a.id)?.proc).filter((p) => p !== undefined)
     for (const approval of R.listApprovals(db, { status: 'pending' })) broker.decide(approval.id, 'deny')
+    scheduler.shutdown()
     svc.shutdown()
     broker.shutdown()
     try {
@@ -101,7 +104,7 @@ export async function createHarness(maxBusy = 3) {
     }
   }
 
-  return { root, cfg, db, ipc, svc, broker, events, ant, trace, runs, messages, finished, close }
+  return { root, cfg, db, ipc, svc, broker, scheduler, events, ant, trace, runs, messages, finished, close }
 }
 
 export type Harness = Awaited<ReturnType<typeof createHarness>>
