@@ -13,7 +13,7 @@ kill -0 $pid 2>/dev/null || { echo "antd failed to start:"; cat "$tmp/antd.log";
 status=0
 for s in ${1:-all}; do
   case $s in
-    all) node e2e/chat.mjs && node e2e/browser.mjs || status=1 ;;
+    all) for f in chat browser security teach; do node "e2e/$f.mjs" || status=1; done ;;
     *) node "e2e/$s.mjs" || status=$? ;;
   esac
 done
