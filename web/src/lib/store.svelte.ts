@@ -433,7 +433,7 @@ export function renameAnt(id: string, name: string) {
   push(id, { id: uid(), kind: 'system', author: 'system', text: `Renamed to ${n}`, at: Date.now() }, false)
 }
 
-export function updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory'>>) {
+export function updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'model'>>) {
   const a = antById(id)
   if (!a) return
   Object.assign(a, patch)

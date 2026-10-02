@@ -120,6 +120,13 @@
       <div class="portrait"><Ant color={ant.color} accessory={ant.accessory} mode="full" size={112} status={ant.status} follow /></div>
       <input class="name" value={ant.name} aria-label="Name" onchange={(e) => e.currentTarget.value.trim() && updateAnt(ant.id, { name: e.currentTarget.value.trim() })} />
       <input class="label" value={ant.label ?? ''} placeholder="Add a label" aria-label="Label" onchange={(e) => updateAnt(ant.id, { label: e.currentTarget.value.trim() })} />
+      {#if app.mode === 'live'}
+        <div class="model-pick" role="radiogroup" aria-label="Model">
+          {#each ['haiku', 'sonnet', 'opus'] as m}
+            <button role="radio" aria-checked={(ant.model ?? 'sonnet') === m} onclick={() => updateAnt(ant.id, { model: m })}>{m[0].toUpperCase() + m.slice(1)}</button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <section>
@@ -372,6 +379,29 @@
 
   .rule {
     color: var(--text-soft);
+  }
+
+  .model-pick {
+    display: flex;
+    gap: 2px;
+    margin-top: 10px;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--bg-input);
+  }
+
+  .model-pick button {
+    height: 26px;
+    padding: 0 12px;
+    border-radius: var(--r-sm);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    transition: background var(--dur) var(--ease-out), color var(--dur);
+  }
+
+  .model-pick button[aria-checked='true'] {
+    background: var(--bg-selected);
+    color: var(--text);
   }
 
   .scope {

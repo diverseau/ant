@@ -205,7 +205,7 @@ export class AntService {
     if (patch.status === 'paused') this.stopAnt(id)
     // Identity changes reach the ant on its next session; restart an idle one now.
     const l = this.live.get(id)
-    if (l && !l.current && (patch.name || patch.description || patch.label)) this.stopAnt(id)
+    if (l && !l.current && (patch.name || patch.description || patch.label || patch.model)) this.stopAnt(id)
     const ant = toAnt(next)
     this.emit({ type: 'ant.updated', ant })
     return ant
