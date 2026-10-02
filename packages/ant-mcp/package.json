@@ -1,7 +1,7 @@
 {
   "name": "@ant/mcp",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.9.0",
   "type": "module",
   "bin": {
     "ant-mcp": "./src/main.ts"

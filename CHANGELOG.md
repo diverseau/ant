@@ -39,6 +39,12 @@ The first working Ant: real ants on real Claude Code sessions.
 - Settings (name, time zone, default model, concurrency) and a Health check; subscription usage ring and panel from Claude Code's rate-limit data; desktop notifications for unattended approvals.
 - Optional systemd user service; dependency checker.
 
+### Also in this release
+- Colonies: create, rename, add/remove members, choose a lead, delete.
+- Helper ants: an ant can propose a new specialist ant, created on your approval.
+- Connectors screen: claude.ai connectors per ant, custom MCP servers, secrets, and chat channels (Telegram, Discord, Slack via Socket Mode).
+- Self-hosting: Docker image and compose file, backup and restore scripts (not yet built on the dev machine).
+
 ### Tooling
 - ~1000 tests with a fake `claude` (no model calls); real end-to-end suites (`server/e2e/run.sh`).
 

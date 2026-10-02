@@ -14,7 +14,7 @@ if (!socket || !token) {
 }
 
 const antd = new AntdClient(socket, token)
-const server = new McpServer({ name: 'ant', version: '0.2.0' })
+const server = new McpServer({ name: 'ant', version: '0.9.0' })
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] })
 const call = async (method: string, params: Record<string, unknown>) => {

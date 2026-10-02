@@ -50,6 +50,6 @@ From the repo root (npm workspaces):
 
 ## Conventions
 
-- Semantic versioning (`web/package.json` is the source of truth, currently `0.1.0`) and Conventional Commits (`feat:`, `fix:`, `perf:`…).
+- Semantic versioning (all workspace `package.json` files share one version, currently `0.9.0`) and Conventional Commits (`feat:`, `fix:`, `perf:`…).
 - Match the style of surrounding code. TypeScript strict, Svelte 5 runes only (no legacy `$:` or stores).
 - Never commit secrets. Use `.env` (gitignored) and keep `.env.example` current.
