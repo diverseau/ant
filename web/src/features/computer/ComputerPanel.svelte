@@ -9,7 +9,7 @@
   import Globe from '@lucide/svelte/icons/globe'
   import Play from '@lucide/svelte/icons/play'
   import { api } from '../../lib/api'
-  import { antById, app, setLease, startComputer, threadById } from '../../lib/store.svelte'
+  import { antById, app, setLease, startComputer, teach, threadById } from '../../lib/store.svelte'
   import FakeScreen from './FakeScreen.svelte'
   import LiveScreen from './LiveScreen.svelte'
 
@@ -26,6 +26,9 @@
   const comp = $derived(ant ? app.computers[ant.id] : undefined)
   const control = $derived(comp?.lease === 'user')
   let opened = $state(false)
+  let teachTitle = $state('')
+  let naming = $state(false)
+  const teaching = $derived(comp?.teaching)
   const browserSteps = $derived(
     (thread?.messages ?? []).filter((m) => m.kind === 'tool' && m.name.startsWith('mcp__browser__') && m.author === ant?.id).slice(-8),
   )
@@ -69,10 +72,28 @@
         {/if}
       </div>
       <div class="actions">
-        {#if control}
+        {#if teaching}
+          <span class="rec" in:rise={{ y: 4, duration: 200 }}><span class="dot-rec"></span>Teaching · {teaching.steps} steps</span>
+          <button class="btn btn-accent" onclick={() => teach(ant.id, 'stop')}><CheckCircle size={15} /> Finish teaching</button>
+          <button class="btn btn-ghost" onclick={() => teach(ant.id, 'cancel')}>Cancel</button>
+        {:else if naming}
+          <form
+            class="teach-form"
+            in:rise={{ y: 4, duration: 200 }}
+            onsubmit={(e) => {
+              e.preventDefault()
+              teach(ant.id, 'start', teachTitle)
+              naming = false
+            }}
+          >
+            <input bind:value={teachTitle} placeholder="What will you show? e.g. file an expense" maxlength="120" />
+            <button class="btn btn-accent" disabled={!teachTitle.trim()}>Start</button>
+          </form>
+        {:else if control}
           <button class="btn btn-primary" onclick={() => setLease(ant.id, 'ant')} in:rise={{ y: 4, duration: 200 }}>
             <CheckCircle size={15} /> I'm done
           </button>
+          <button class="btn btn-ghost" onclick={() => (naming = true)}><GraduationCap size={15} /> Teach a task</button>
         {:else}
           <button class="btn btn-ghost" onclick={() => setLease(ant.id, 'user')} in:rise={{ y: 4, duration: 200 }}>
             <Hand size={15} /> Take over
@@ -172,6 +193,45 @@
     min-width: 0;
   }
 
+  .rec {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    color: var(--text-soft);
+  }
+
+  .dot-rec {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: rec 1.2s ease-in-out infinite;
+  }
+
+  @keyframes rec {
+    50% {
+      opacity: 0.35;
+      transform: scale(0.8);
+    }
+  }
+
+  .teach-form {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .teach-form input {
+    flex: 1;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-input);
+    font-size: var(--text-sm);
+  }
+
   .urlbar {
     display: flex;
     align-items: center;
@@ -232,6 +292,8 @@
 
   .actions {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
   }
 

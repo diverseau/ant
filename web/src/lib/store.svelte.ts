@@ -516,6 +516,15 @@ export async function startComputer(antId: string) {
   }
 }
 
+export async function teach(antId: string, action: 'start' | 'stop' | 'cancel', title?: string) {
+  try {
+    app.computers[antId] = await api.teach(antId, action, title)
+    if (action === 'stop') app.takeover = false
+  } catch (err) {
+    fail(err)
+  }
+}
+
 export async function setLease(antId: string, holder: 'ant' | 'user') {
   try {
     app.computers[antId] = await api.lease(antId, holder)

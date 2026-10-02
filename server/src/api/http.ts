@@ -160,6 +160,37 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.json(svc.computers.state(id))
   })
 
+  // Teach a task: record a demonstration, then ask the ant to turn it into a skill.
+  app.post('/api/ants/:id/computer/teach', async (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const b = await body(c, z.object({ action: z.enum(['start', 'stop', 'cancel']), title: z.string().max(120).optional() }))
+    const folder = svc.pathsFor(id).folder
+    if (b.action === 'start') {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      try {
+        svc.computers.startTeaching(id, join(folder, 'teach', stamp), b.title?.trim() || 'a task')
+      } catch (err) {
+        throw new HttpError(409, err instanceof Error ? err.message : String(err))
+      }
+      return c.json(svc.computers.state(id))
+    }
+    const rec = svc.computers.stopTeaching(id)
+    if (rec && b.action === 'stop') {
+      const rel = rec.dir.slice(folder.length + 1)
+      const title = rec.md.split('\n')[0].replace(/^# Demonstration: /, '')
+      svc.computers.setLease(id, 'ant')
+      svc.system(svc.antThread(id).id, `You showed ${svc.antRow(id).name} how to ${title}`)
+      svc.enqueue(id, {
+        threadId: svc.antThread(id).id,
+        text: `[${svc.userName}] I just showed you on your computer how to: ${title}. The recording is in ${rel}/steps.md, with screenshots next to it. Read it and look at the screenshots, then draft a skill with save_skill: when to use it, inputs, the steps, how to check it worked, what to return, and what needs my approval. Generalise where I clicked specific examples. Ask me about anything ambiguous before saving.`,
+        source: 'user',
+        depth: 0,
+        enqueuedAt: Date.now(),
+      })
+    }
+    return c.json(svc.computers.state(id))
+  })
+
   app.get(
     '/ws/ants/:id/screen',
     upgradeWebSocket((c) => {

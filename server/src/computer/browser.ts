@@ -253,6 +253,29 @@ export class AntBrowser {
     }
   }
 
+  /** What's under a point, for teach-by-demonstration notes. Never reads input values. */
+  async describeAt(x: number, y: number): Promise<{ label: string; password: boolean } | null> {
+    if (!this.session) return null
+    const px = Math.round(x * this.size.width)
+    const py = Math.round(y * this.size.height)
+    const expression = `(() => {
+      const el = document.elementFromPoint(${px}, ${py}); if (!el) return null
+      const t = el.closest('button,a,input,select,textarea,label,[role],summary') || el
+      const text = (t.getAttribute('aria-label') || t.getAttribute('title') || t.getAttribute('placeholder') || t.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 80)
+      const role = t.getAttribute('role') || t.tagName.toLowerCase()
+      return { label: (text ? '"' + text + '" ' : '') + role, password: t.type === 'password' }
+    })()`
+    const r = await this.send('Runtime.evaluate', { expression, returnByValue: true }, this.session.sessionId).catch(() => null)
+    return r?.result?.value ?? null
+  }
+
+  /** True when the focused element is a password field (teach mode must not record it). */
+  async focusIsPassword(): Promise<boolean> {
+    if (!this.session) return false
+    const r = await this.send('Runtime.evaluate', { expression: 'document.activeElement?.type === "password"', returnByValue: true }, this.session.sessionId).catch(() => null)
+    return r?.result?.value === true
+  }
+
   async screenshot(): Promise<string | null> {
     if (!this.session) return null
     const r = await this.send('Page.captureScreenshot', { format: 'jpeg', quality: 60 }, this.session.sessionId).catch(() => null)

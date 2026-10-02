@@ -44,6 +44,7 @@ export const api = {
   settings: (patch: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', patch),
   computer: (antId: string) => req<ComputerState>('GET', `/api/ants/${antId}/computer`),
   startComputer: (antId: string) => req<ComputerState>('POST', `/api/ants/${antId}/computer/start`),
+  teach: (antId: string, action: 'start' | 'stop' | 'cancel', title?: string) => req<ComputerState>('POST', `/api/ants/${antId}/computer/teach`, { action, title }),
   lease: (antId: string, holder: 'ant' | 'user') => req<ComputerState>('POST', `/api/ants/${antId}/computer/lease`, { holder }),
   routines: (antId: string) => req<RoutineView[]>('GET', `/api/routines?antId=${encodeURIComponent(antId)}`),
   createRoutine: (input: CreateRoutineInput) => req<{ routine: RoutineView; key?: string }>('POST', '/api/routines', input),

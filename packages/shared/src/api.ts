@@ -45,6 +45,8 @@ export interface ComputerState {
   title: string | null
   /** Who drives the browser: the ant, or the user after "Take over". */
   lease: 'ant' | 'user'
+  /** Present while the user is teaching a task by demonstration. */
+  teaching?: { title: string; steps: number; startedAt: number }
 }
 
 export interface RoutineView {
