@@ -1,5 +1,5 @@
-import type { AntEvent, ComputerState, Health, Settings, UsageWindows } from '@ant/shared'
-import { api, connectEvents } from './api'
+import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, UsageWindows } from '@ant/shared'
+import { api, connectEvents, type RoutinePatch } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
 import type { Accessory, Ant, AntColor, ApprovalMessage, DraftMessage, Message, Thread } from './types'
@@ -40,6 +40,8 @@ export const app = $state({
   focusMessage: null as string | null,
   /** File open in the viewer. */
   viewer: null as { antId: string; path: string; name: string } | null,
+  routines: [] as RoutineView[],
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 })
 
 const live = () => app.mode === 'live'
@@ -137,6 +139,8 @@ async function resync() {
   app.usage = b.usage
   app.health = b.health
   app.settings = b.settings
+  app.routines = b.routines
+  app.timezone = b.settings.timezone
   app.typing = {}
   if (!threadById(app.selectedId)) app.selectedId = sortedThreads()[0]?.id ?? ''
 }
@@ -168,6 +172,12 @@ function upsertThread(summary: Omit<Thread, 'messages'>) {
   if (t) Object.assign(t, summary)
   else app.threads.push({ ...summary, messages: [] })
   if (summary.id === app.selectedId && summary.unread > 0) scheduleRead(summary.id)
+}
+
+function upsertRoutine(routine: RoutineView) {
+  const i = app.routines.findIndex((r) => r.id === routine.id)
+  if (i >= 0) app.routines[i] = routine
+  else app.routines.push(routine)
 }
 
 function scheduleRead(threadId: string) {
@@ -228,10 +238,62 @@ function apply(e: AntEvent) {
     case 'computer':
       app.computers[e.state.antId] = e.state
       break
+    case 'routine.updated':
+      upsertRoutine(e.routine)
+      break
+    case 'routine.deleted':
+      app.routines = app.routines.filter((r) => r.id !== e.routineId)
+      break
   }
 }
 
 /* ---------- actions ---------- */
+
+// Routine callers catch errors to show the server's message beside the action/field.
+function requireRoutines() {
+  if (!live()) throw new Error('Routines are available when connected to antd.')
+}
+
+export async function createRoutine(input: CreateRoutineInput) {
+  requireRoutines()
+  const result = await api.createRoutine(input)
+  upsertRoutine(result.routine)
+  return result
+}
+
+export async function updateRoutine(id: string, patch: RoutinePatch) {
+  requireRoutines()
+  const before = app.routines.find((r) => r.id === id)?.enabled
+  if (patch.enabled !== undefined) {
+    const routine = app.routines.find((r) => r.id === id)
+    if (routine) routine.enabled = patch.enabled
+  }
+  try {
+    const routine = await api.updateRoutine(id, patch)
+    upsertRoutine(routine)
+    return routine
+  } catch (err) {
+    const routine = app.routines.find((r) => r.id === id)
+    if (routine && before !== undefined && patch.enabled !== undefined && routine.enabled === patch.enabled) routine.enabled = before
+    throw err
+  }
+}
+
+export async function deleteRoutine(id: string) {
+  requireRoutines()
+  await api.deleteRoutine(id)
+  app.routines = app.routines.filter((r) => r.id !== id)
+}
+
+export async function testRoutine(id: string) {
+  requireRoutines()
+  await api.testRoutine(id)
+}
+
+export async function routineRuns(id: string) {
+  requireRoutines()
+  return api.routineRuns(id)
+}
 
 export function select(id: string) {
   const t = threadById(id)
@@ -415,6 +477,7 @@ export async function saveSettings(patch: Partial<Settings>) {
   if (!live()) return
   try {
     app.settings = await api.settings(patch)
+    app.timezone = app.settings.timezone
     if (patch.userName) app.user.name = app.settings.userName
     notify('Saved')
   } catch (err) {
