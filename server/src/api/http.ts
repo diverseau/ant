@@ -415,7 +415,7 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
       R.listRules(svc.db, { antId: id }).map((r) => ({
         id: r.id,
         pattern: r.pattern,
-        label: describeTool(r.pattern, {}).title,
+        label: r.note?.startsWith('input:') ? `${r.pattern === 'Bash' ? 'Run' : r.pattern} · ${r.note.slice(6).replace(/\\"/g, '"').slice(0, 80)}` : describeTool(r.pattern, {}).title,
         behaviour: r.behaviour,
         scope: r.scope,
         createdAt: r.createdAt,
