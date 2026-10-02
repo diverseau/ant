@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, normalize, resolve } from 'node:path'
 import { insideFolder } from '../rules/engine.ts'
+import { describeTool } from '../rules/describe.ts'
 import { antDataDir } from '../config.ts'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
@@ -368,6 +369,26 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
         snippet: r.snippet.replace(/<mark>/g, '\u0001').replace(/<\/mark>/g, '\u0002'),
       })),
     )
+  })
+
+  app.get('/api/ants/:id/rules', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    return c.json(
+      R.listRules(svc.db, { antId: id }).map((r) => ({
+        id: r.id,
+        pattern: r.pattern,
+        label: describeTool(r.pattern, {}).title,
+        behaviour: r.behaviour,
+        scope: r.scope,
+        createdAt: r.createdAt,
+      })),
+    )
+  })
+  app.delete('/api/rules/:id', (c) => {
+    if (!R.deleteRule(svc.db, c.req.param('id'))) throw new HttpError(404, 'No such rule')
+    // Allow rules are baked into each ant's generated settings; regenerate on next turn.
+    svc.refreshIdle()
+    return c.body(null, 204)
   })
 
   app.get('/api/ants/:id/skills', (c) => c.json(svc.skills.list(svc.pathsFor(svc.antRow(c.req.param('id')).id).folder)))

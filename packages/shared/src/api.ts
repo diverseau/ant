@@ -121,6 +121,17 @@ export interface ConnectorsView {
   secrets: SecretView[]
 }
 
+export interface RuleView {
+  id: string
+  /** Tool name pattern, e.g. mcp__claude_ai_Gmail__send_message or Write. */
+  pattern: string
+  /** Human label for the tool, e.g. "Gmail: send message". */
+  label: string
+  behaviour: 'allow' | 'ask' | 'handoff' | 'deny'
+  scope: 'global' | 'ant'
+  createdAt: number
+}
+
 export interface SkillView {
   name: string
   description: string

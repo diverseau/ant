@@ -1,5 +1,5 @@
 // Client for antd: REST calls and the live event stream.
-import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, SearchHit, Settings, SkillView } from '@ant/shared'
+import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
 export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled'>>
 
@@ -37,6 +37,8 @@ export const api = {
   decide: (approvalId: string, decision: ApprovalDecision) => req('POST', `/api/approvals/${approvalId}`, { decision }),
   draft: (messageId: string, action: 'send' | 'discard', body?: string) => req('POST', `/api/messages/${messageId}/draft`, { action, body }),
   older: (threadId: string, before: string) => req<Message[]>('GET', `/api/threads/${threadId}/messages?before=${encodeURIComponent(before)}`),
+  rules: (antId: string) => req<RuleView[]>('GET', `/api/ants/${antId}/rules`),
+  deleteRule: (id: string) => req('DELETE', `/api/rules/${id}`),
   skills: (antId: string) => req<SkillView[]>('GET', `/api/ants/${antId}/skills`),
   search: (q: string) => req<SearchHit[]>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   settings: (patch: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', patch),

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition'
   import { onMount } from 'svelte'
   import type { RoutineView } from '@ant/shared'
   import Sparkles from '@lucide/svelte/icons/sparkles'
@@ -10,7 +11,9 @@
   import Plus from '@lucide/svelte/icons/plus'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import Ant from '../../lib/ant/Ant.svelte'
-  import { skills } from '../../lib/mock/data'
+  import { skills as mockSkills } from '../../lib/mock/data'
+  import { api } from '../../lib/api'
+  import type { RuleView } from '@ant/shared'
   import { app, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateRoutine } from '../../lib/store.svelte'
   import { collapse, rise } from '../../lib/motion'
   import Switch from '../../lib/ui/Switch.svelte'
@@ -92,6 +95,18 @@
       pending[id] = false
     }
   }
+  let liveRules: RuleView[] = $state([])
+  $effect(() => {
+    if (app.mode !== 'live' || !ant) return
+    const id = ant.id
+    void app.threads.length // refresh after new approvals land
+    api.rules(id).then((r) => (liveRules = r)).catch(() => (liveRules = []))
+  })
+  async function revoke(id: string) {
+    liveRules = liveRules.filter((r) => r.id !== id)
+    await api.deleteRule(id).catch(() => {})
+  }
+
   let rules = $state([
     { text: 'Sending email or Slack to anyone outside the team', mode: 'Ask first' },
     { text: 'Reading calendars, docs and inboxes', mode: 'Allow' },
@@ -114,11 +129,14 @@
 
     <section>
       <h3><Sparkles size={13} /> Skills</h3>
-      {#each skills.slice(0, 3) as s}
+      {#each app.mode === 'live' ? app.skills : mockSkills.slice(0, 3) as s}
         <div class="item">
           <span class="mono">/{s.name}</span>
           <span class="sub">{s.description}</span>
+          {#if 'scope' in s && s.scope === 'colony'}<span class="scope">colony</span>{/if}
         </div>
+      {:else}
+        <p class="hint">No skills yet. When {ant.name} figures out a repeatable process, ask it to save it as a skill.</p>
       {/each}
     </section>
 
@@ -182,12 +200,25 @@
 
     <section>
       <h3><ShieldCheck size={13} /> Rules</h3>
-      {#each rules as r}
-        <div class="item row">
-          <span class="rule">{r.text}</span>
-          <span class="mode" class:ask={r.mode === 'Ask first'} class:hand={r.mode === 'Hand off'}>{r.mode}</span>
-        </div>
-      {/each}
+      {#if app.mode === 'live'}
+        {#each liveRules as r (r.id)}
+          <div class="item row" out:slide={{ duration: 200 }}>
+            <span class="rule">{r.label}</span>
+            <span class="mode">{r.behaviour === 'allow' ? 'Always allowed' : r.behaviour}</span>
+            <button class="revoke" onclick={() => revoke(r.id)} aria-label="Revoke">Revoke</button>
+          </div>
+        {/each}
+        <p class="hint">
+          {liveRules.length ? 'Added with “Always allow”.' : 'Nothing permanently allowed yet.'} By default {ant.name} asks before writing outside its folder, sending anything to people or changing connected services, and hands payments and sign-ins to you.
+        </p>
+      {:else}
+        {#each rules as r}
+          <div class="item row">
+            <span class="rule">{r.text}</span>
+            <span class="mode" class:ask={r.mode === 'Ask first'} class:hand={r.mode === 'Hand off'}>{r.mode}</span>
+          </div>
+        {/each}
+      {/if}
     </section>
 
     <section class="danger">
@@ -341,6 +372,26 @@
 
   .rule {
     color: var(--text-soft);
+  }
+
+  .scope {
+    margin-left: 8px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+  }
+
+  .revoke {
+    flex: none;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: var(--r-sm);
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+
+  .revoke:hover {
+    background: rgb(229 96 79 / 0.12);
+    color: #f4a69b;
   }
 
   .mode {

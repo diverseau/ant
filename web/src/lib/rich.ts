@@ -11,7 +11,8 @@ export type Inline =
 
 export type Block = { t: 'p'; inl: Inline[] } | { t: 'ul'; items: Inline[][] }
 
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|@([A-Za-z][\w-]*)|(^|\s)(\/[\w-]+)/g
+// A /skill tag only counts at the very start of a message (how skills are invoked).
+const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|@([A-Za-z][\w-]*)|(^)(\/[\w-]+)(?=\s|$)/g
 
 export function inline(src: string, ants: Ant[]): Inline[] {
   const out: Inline[] = []
