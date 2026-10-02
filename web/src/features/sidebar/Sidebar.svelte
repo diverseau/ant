@@ -166,7 +166,7 @@
         </button>
       {/if}
       {#if !app.sidebarCollapsed}
-        <button class="icon-btn" aria-label="Settings" title="Settings ({mod}+,)"><Settings size={16} /></button>
+        <button class="icon-btn" aria-label="Settings" title="Settings ({mod}+,)" onclick={() => (app.overlay = 'settings')}><Settings size={16} /></button>
       {/if}
     </div>
   </footer>

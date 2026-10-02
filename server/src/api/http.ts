@@ -269,6 +269,14 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.body(null, 202)
   })
   app.get('/api/routines/:id/runs', (c) => c.json(scheduler.runs(scheduler.get(c.req.param('id')).id)))
+  app.get('/api/settings', (c) => c.json(svc.settings()))
+  app.patch('/api/settings', async (c) => {
+    const b = await body(
+      c,
+      z.object({ userName: z.string().max(40).optional(), timezone: z.string().optional(), defaultModel: z.string().max(60).optional(), maxBusy: z.number().int().min(1).max(10).optional() }),
+    )
+    return c.json(svc.updateSettings(b))
+  })
   app.put('/api/settings/timezone', async (c) => {
     const b = await body(c, z.object({ timezone: z.string().min(1) }))
     try {

@@ -11,7 +11,10 @@
 
   $effect(() => {
     opener = document.activeElement
-    const first = panel?.querySelector<HTMLElement>('[autofocus], input, textarea, button')
+    const first =
+      panel?.querySelector<HTMLElement>('[autofocus]') ??
+      panel?.querySelector<HTMLElement>('input:not([type=hidden]), textarea') ??
+      panel?.querySelector<HTMLElement>('button')
     first?.focus()
     return () => (opener as HTMLElement | null)?.focus?.()
   })

@@ -67,6 +67,7 @@ function health(): Health {
   const value: Health = {
     claude: { found: !!version, version, loggedIn, authMethod, plan },
     sandbox: { ok: missing.length === 0, missing },
+    computer: { chromium: ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome'].some(which) },
     antHome: cfg.antHome,
     version: cfg.version,
   }

@@ -1,11 +1,11 @@
-import type { AntEvent, ComputerState, Health, UsageWindows } from '@ant/shared'
+import type { AntEvent, ComputerState, Health, Settings, UsageWindows } from '@ant/shared'
 import { api, connectEvents } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
 import type { Accessory, Ant, AntColor, ApprovalMessage, DraftMessage, Message, Thread } from './types'
 
 export type Panel = 'computer' | 'details' | null
-export type Overlay = 'palette' | 'new-ant' | 'connectors' | 'usage' | null
+export type Overlay = 'palette' | 'new-ant' | 'connectors' | 'usage' | 'settings' | null
 /** `live` talks to antd; `demo` runs the scripted mock when antd isn't reachable. */
 export type Mode = 'connecting' | 'live' | 'demo'
 
@@ -35,6 +35,7 @@ export const app = $state({
   health: null as Health | null,
   notices: [] as Notice[],
   computers: {} as Record<string, ComputerState>,
+  settings: null as Settings | null,
   /** File open in the viewer. */
   viewer: null as { antId: string; path: string; name: string } | null,
 })
@@ -133,6 +134,7 @@ async function resync() {
   app.threads = b.threads
   app.usage = b.usage
   app.health = b.health
+  app.settings = b.settings
   app.typing = {}
   if (!threadById(app.selectedId)) app.selectedId = sortedThreads()[0]?.id ?? ''
 }
@@ -383,6 +385,17 @@ export async function createAnt(input: { name: string; label?: string; descripti
   app.threads.push({ id, kind: 'ant', refId: id, unread: 0, pinned: false, updatedAt: Date.now(), messages: [] })
   select(id)
   return id
+}
+
+export async function saveSettings(patch: Partial<Settings>) {
+  if (!live()) return
+  try {
+    app.settings = await api.settings(patch)
+    if (patch.userName) app.user.name = app.settings.userName
+    notify('Saved')
+  } catch (err) {
+    fail(err)
+  }
 }
 
 export async function startComputer(antId: string) {

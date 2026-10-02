@@ -8,6 +8,7 @@
   import UsagePanel from './features/usage/UsagePanel.svelte'
   import Toasts from './lib/ui/Toasts.svelte'
   import FileViewer from './lib/ui/FileViewer.svelte'
+  import Settings from './features/settings/Settings.svelte'
   import { app, init, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
 
   init()
@@ -44,6 +45,9 @@
     } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault()
       selectRelative(e.key === 'ArrowUp' ? -1 : 1)
+    } else if (mod && e.key === ',') {
+      e.preventDefault()
+      app.overlay = 'settings'
     } else if (mod && e.shiftKey && k === 'm') {
       e.preventDefault()
       app.overlay = 'connectors'
@@ -73,6 +77,8 @@
   <NewAnt />
 {:else if app.overlay === 'connectors'}
   <Connectors />
+{:else if app.overlay === 'settings'}
+  <Settings />
 {:else if app.overlay === 'usage'}
   <UsagePanel />
 {/if}

@@ -11,12 +11,22 @@ export interface Bootstrap {
   usage: UsageWindows | null
   health: Health
   routines: RoutineView[]
-  settings: { timezone: string }
+  settings: Settings
+}
+
+export interface Settings {
+  userName: string
+  timezone: string
+  /** Model alias for new ants: sonnet, opus, haiku… */
+  defaultModel: string
+  /** How many ants may work at the same time. */
+  maxBusy: number
 }
 
 export interface Health {
   claude: { found: boolean; version?: string; loggedIn: boolean; authMethod?: string; plan?: string }
   sandbox: { ok: boolean; missing: string[] }
+  computer: { chromium: boolean }
   antHome: string
   version: string
 }

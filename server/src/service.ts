@@ -80,6 +80,40 @@ export class AntService {
 
   /* ---------------- reads ---------------- */
 
+  settings(): Bootstrap['settings'] {
+    return {
+      userName: this.userName,
+      timezone: R.getSetting(this.db, 'timezone', Intl.DateTimeFormat().resolvedOptions().timeZone),
+      defaultModel: R.getSetting(this.db, 'defaultModel', this.cfg.defaultModel),
+      maxBusy: R.getSetting(this.db, 'maxBusy', this.cfg.maxBusy),
+    }
+  }
+
+  updateSettings(patch: Partial<Bootstrap['settings']>) {
+    if (patch.userName !== undefined) {
+      const n = patch.userName.trim()
+      if (!n) throw new HttpError(400, 'Your name can’t be empty')
+      this.userName = n
+      R.setSetting(this.db, 'user.name', n)
+      // Names appear in every ant's CLAUDE.md; idle ants pick it up on their next turn.
+      for (const [antId, l] of this.live) if (!l.current) this.stopAnt(antId)
+    }
+    if (patch.timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: patch.timezone })
+      } catch {
+        throw new HttpError(400, 'Unknown time zone')
+      }
+      R.setSetting(this.db, 'timezone', patch.timezone)
+    }
+    if (patch.defaultModel !== undefined) R.setSetting(this.db, 'defaultModel', patch.defaultModel)
+    if (patch.maxBusy !== undefined) {
+      R.setSetting(this.db, 'maxBusy', Math.max(1, Math.min(10, Math.round(patch.maxBusy))))
+      this.pump()
+    }
+    return this.settings()
+  }
+
   /** Filled in by main.ts once the scheduler exists. */
   routineViews: () => Bootstrap['routines'] = () => []
 
@@ -93,7 +127,7 @@ export class AntService {
       usage: R.getSetting<UsageWindows | null>(this.db, 'usage.windows', null),
       health,
       routines: this.routineViews(),
-      settings: { timezone: R.getSetting(this.db, 'timezone', Intl.DateTimeFormat().resolvedOptions().timeZone) },
+      settings: this.settings(),
     }
   }
 
@@ -134,7 +168,7 @@ export class AntService {
       description: input.description.trim() || 'A helpful ant.',
       color: input.color,
       accessory: input.accessory,
-      model: input.model ?? this.cfg.defaultModel,
+      model: input.model ?? R.getSetting(this.db, 'defaultModel', this.cfg.defaultModel),
       effort: '',
     })
     const thread = R.createThread(this.db, { kind: 'ant', refId: row.id })
@@ -288,7 +322,7 @@ export class AntService {
       if (!q.length) continue
       const l = this.live.get(antId)
       if (l?.current) continue
-      if (this.busyCount() >= this.cfg.maxBusy) return
+      if (this.busyCount() >= R.getSetting(this.db, 'maxBusy', this.cfg.maxBusy)) return
       const turn = q.shift()!
       this.startTurn(antId, turn)
     }
