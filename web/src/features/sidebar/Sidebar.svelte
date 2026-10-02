@@ -15,6 +15,7 @@
   import { collapse, rise } from '../../lib/motion'
   import { app, deleteThread, sortedThreads, togglePin } from '../../lib/store.svelte'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
+  import UsageRing from '../../lib/ui/UsageRing.svelte'
   import ThreadRow from './ThreadRow.svelte'
 
   const sorted = $derived(sortedThreads())
@@ -153,6 +154,18 @@
       <span class="me">{app.user.name[0]}</span>
       {#if !app.sidebarCollapsed}
         <span class="who">{app.user.name}<span class="plan"> · {app.user.plan}</span></span>
+      {/if}
+      {#if app.mode !== 'demo'}
+        <button
+          class="icon-btn usage"
+          aria-label={app.usage?.fiveHour ? `Claude subscription usage: ${Math.round(app.usage.fiveHour.utilization * 100)}% of 5-hour window used. Open usage details.` : 'Claude subscription usage: no data yet. Open usage details.'}
+          aria-haspopup="dialog"
+          onclick={() => (app.overlay = 'usage')}
+        >
+          <UsageRing value={app.usage?.fiveHour?.utilization ?? null} size={16} />
+        </button>
+      {/if}
+      {#if !app.sidebarCollapsed}
         <button class="icon-btn" aria-label="Settings" title="Settings ({mod}+,)"><Settings size={16} /></button>
       {/if}
     </div>
@@ -312,7 +325,18 @@
   }
 
   .collapsed .account {
+    flex-direction: column;
     justify-content: center;
+    gap: 6px;
+    height: auto;
+    padding: 8px 0 0;
+  }
+
+  .usage {
+    flex: none;
+  }
+
+  .collapsed .usage {
     padding: 0;
   }
 
