@@ -4,6 +4,8 @@ export type AntStatus = 'idle' | 'working' | 'attention' | 'paused'
 
 export interface Ant {
   id: string
+  slug?: string
+  model?: string
   name: string
   label?: string
   description: string
@@ -62,6 +64,9 @@ export interface ApprovalMessage extends Base {
   action: string
   detail: string
   connector: string
+  approvalId?: string
+  behaviour?: 'ask' | 'handoff'
+  expiresAt?: number
   decision?: 'once' | 'always' | 'deny' | 'expired'
 }
 
@@ -85,8 +90,35 @@ export interface RoutineMessage extends Base {
   result: 'succeeded' | 'failed' | 'running'
 }
 
+export interface ToolMessage extends Base {
+  kind: 'tool'
+  toolUseId: string
+  name: string
+  /** Short human summary, e.g. "Ran npm test" or "Read src/app.ts". */
+  title: string
+  detail?: string
+  state: 'running' | 'ok' | 'error' | 'denied'
+  durationMs?: number
+}
+
+export interface FileMessage extends Base {
+  kind: 'file'
+  path: string
+  name: string
+  bytes?: number
+}
+
+export interface ErrorMessage extends Base {
+  kind: 'error'
+  text: string
+  detail?: string
+}
+
 export type Message =
   | TextMessage
+  | ToolMessage
+  | FileMessage
+  | ErrorMessage
   | ComputerMessage
   | ChecklistMessage
   | ApprovalMessage

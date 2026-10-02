@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+// The `ant` MCP server: spawned by each ant's `claude` process, forwards every tool
+// call to antd over its local socket. Holds no state of its own.
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { z } from 'zod'
+import { AntdClient } from './client.ts'
+
+const socket = process.env.ANT_SOCKET
+const token = process.env.ANT_TOKEN
+if (!socket || !token) {
+  console.error('ant-mcp: ANT_SOCKET and ANT_TOKEN are required')
+  process.exit(1)
+}
+
+const antd = new AntdClient(socket, token)
+const server = new McpServer({ name: 'ant', version: '0.2.0' })
+
+const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] })
+const call = async (method: string, params: Record<string, unknown>) => {
+  try {
+    const r = await antd.call(method, params)
+    return text(typeof r === 'string' ? r : JSON.stringify(r ?? { ok: true }))
+  } catch (err) {
+    return { ...text(`Ant error: ${err instanceof Error ? err.message : String(err)}`), isError: true }
+  }
+}
+
+// Target of --permission-prompt-tool. Not meant for the model to call directly.
+server.registerTool(
+  'permission',
+  {
+    description: 'Internal: Ant permission broker. Do not call this yourself.',
+    inputSchema: { tool_name: z.string(), input: z.any(), tool_use_id: z.string().optional() },
+  },
+  async (args) => {
+    try {
+      const decision = await antd.call('permission', args as Record<string, unknown>)
+      return text(JSON.stringify(decision))
+    } catch (err) {
+      return text(JSON.stringify({ behavior: 'deny', message: `Ant could not reach its approval service: ${String(err)}` }))
+    }
+  },
+)
+
+server.registerTool(
+  'report_checklist',
+  {
+    description: 'Show the user a structured result as a checklist card. Use for multi-step results.',
+    inputSchema: {
+      items: z
+        .array(z.object({ service: z.string(), result: z.string(), detail: z.string().optional(), ok: z.boolean().default(true) }))
+        .min(1)
+        .max(20),
+    },
+  },
+  (args) => call('report_checklist', args),
+)
+
+server.registerTool(
+  'present_draft',
+  {
+    description:
+      'Propose a message that would be sent to a person (email, Slack, DM). The user can edit it and must approve before anything is sent. Never send messages to people any other way.',
+    inputSchema: {
+      channel: z.enum(['email', 'slack']),
+      to: z.string(),
+      subject: z.string().optional(),
+      body: z.string(),
+    },
+  },
+  (args) => call('present_draft', args),
+)
+
+server.registerTool(
+  'request_approval',
+  {
+    description:
+      'Ask the user before doing something irreversible or outward-facing that your tools would not otherwise ask about: purchases, payments, sends, deletions, publishing, or browser actions with real-world effect. Blocks until the user decides.',
+    inputSchema: { action: z.string(), detail: z.string(), risk: z.enum(['low', 'medium', 'high']).default('medium') },
+  },
+  (args) => call('request_approval', args),
+)
+
+server.registerTool(
+  'set_status',
+  { description: 'Set a short live status line shown next to your name, e.g. "Pulling the Salesforce list".', inputSchema: { text: z.string().max(80) } },
+  (args) => call('set_status', args),
+)
+
+server.registerTool(
+  'list_ants',
+  { description: 'List the ants in this colony with their jobs and current status.', inputSchema: {} },
+  () => call('list_ants', {}),
+)
+
+server.registerTool(
+  'message_ant',
+  {
+    description:
+      'Send a message to another ant (delegate a task or ask a question). Their reply arrives later as a new message starting with [Reply from <name>]. Keep requests specific and self-contained.',
+    inputSchema: { to: z.string().describe('Ant name'), text: z.string() },
+  },
+  (args) => call('message_ant', args),
+)
+
+server.registerTool(
+  'post_to_colony',
+  { description: 'Post a message into a colony chat you are a member of.', inputSchema: { colony: z.string().describe('Colony name'), text: z.string() } },
+  (args) => call('post_to_colony', args),
+)
+
+server.registerTool(
+  'memory',
+  {
+    description:
+      'Your long-term memory (memory/MEMORY.md), loaded at the start of every session. add a durable fact or preference, replace an entry containing old_text, or remove one. Keep entries short.',
+    inputSchema: {
+      op: z.enum(['add', 'replace', 'remove']),
+      text: z.string().optional(),
+      old_text: z.string().optional(),
+    },
+  },
+  (args) => call('memory', args),
+)
+
+server.registerTool(
+  'share_file',
+  { description: 'Show a file from your folder to the user as a file card in chat.', inputSchema: { path: z.string() } },
+  (args) => call('share_file', args),
+)
+
+server.registerTool(
+  'notify',
+  {
+    description: 'Ping the user outside the app (desktop notification). Only for things that need attention soon.',
+    inputSchema: { text: z.string().max(200), urgency: z.enum(['low', 'normal', 'high']).default('normal') },
+  },
+  (args) => call('notify', args),
+)
+
+await server.connect(new StdioServerTransport())

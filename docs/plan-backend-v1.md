@@ -372,6 +372,20 @@ Each is a small script under `server/spikes/` against Claude Code 2.1.286 on thi
 
 ---
 
+### Spike results (2026-10-03, Claude Code 2.1.286, Haiku)
+| # | Result | Design consequence |
+|---|---|---|
+| 1 | One `claude -p --input-format stream-json` process handles many turns; context survives. A message sent mid-turn **queues** until the turn ends. `{"type":"control_request","request":{"subtype":"interrupt"}}` works: `control_response` success, then `result` `error_during_execution`; the session continues | Keep one process per active ant. "Priority" = interrupt, then send. Stop = interrupt |
+| 2 | `--permission-prompt-tool mcp__ant__permission` receives `{tool_name, input, tool_use_id}` for MCP tools and file tools; reply text JSON `{"behavior":"allow","updatedInput":…}` or `{"behavior":"deny","message":…}`; the deny message reaches the model as a tool error | Broker contract confirmed |
+| 3 | Sandbox (bwrap) blocks a script writing to `/tmp` and `~`; Read deny rules work; `autoAllowBashIfSandboxed` runs Bash without prompts. A host outside `allowedDomains` **silently hangs** in `-p` (no prompt reaches our tool). `WebFetch(domain:*)` in allow opens Bash network | Per-ant network mode: `open` (default, `WebFetch(domain:*)`) or `allowlist` (`strictAllowlist` + domains), never "ask" |
+| 3b | `permissions.allow` in the project's `.claude/settings.json` is **ignored** in `-p` (workspace never trusted); deny rules still apply. Allow rules passed via `--settings <file>` work, and `strictAllowlist` only works there | Generated settings live in antd's data dir (`~/.local/share/ant/ants/<id>/settings.json`), passed with `--settings`, denied to the ant. The ant folder's `.claude/` holds only skills |
+| 3c | A `PreToolUse` command hook from `--settings` runs on every tool and can deny with `permissionDecision: "deny"` | Floors hook confirmed |
+| 4 | claude.ai connectors (Gmail, Calendar, Drive, Supabase…) load only with user settings **or** with env `ENABLE_CLAUDEAI_MCP_SERVERS=true`. With `--setting-sources project,local` + that env, ants get connectors but none of your personal plugins/hooks/skills. `--strict-mcp-config` also drops them | Spawn with `--setting-sources project,local`, `ENABLE_CLAUDEAI_MCP_SERVERS=true`, no `--strict-mcp-config`; scope per ant with `mcp__claude_ai_<Name>__*` deny rules |
+| 5 | A stream-json user message `/greet Leon` invokes the project skill `greet` | `/` menu sends skills as plain messages |
+| 6 | `rate_limit_event` arrives each turn: `{status, rateLimitType, resetsAt, unifiedWindows: {five_hour: {utilization, resetsAt}, seven_day: {…}}}`. `result.total_cost_usd` is **cumulative per session** | Usage meter reads windows directly; per-run cost = delta. Limit-hit shape still unseen: treat `status != "allowed"` or an error result mentioning limits as limited |
+| 7 | `autoMemoryEnabled: false` removes `memory_paths`. `CLAUDE.md` in cwd loads | Inline memory into generated `CLAUDE.md` |
+| — | MCP tools are deferred behind `ToolSearch` (one extra turn on first use) | Fine; mention key Ant tools in `CLAUDE.md` so they're found quickly |
+
 ## 13. Data model (SQLite, Drizzle)
 
 | Table | Key fields |
