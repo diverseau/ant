@@ -113,6 +113,9 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
     sandbox: {
       enabled: true,
       autoAllowBashIfSandboxed: true,
+      // Inside the Ant container there are no privileged namespaces for bubblewrap; the
+      // container is the outer boundary (Claude Code sandboxing docs, "Linux sandbox strength").
+      ...(process.env.ANT_IN_CONTAINER === '1' && { enableWeakerNestedSandbox: true }),
       filesystem: { denyRead: denies.map((d) => d.replace(/^\/\//, '/').replace(/\/\*\*$/, '')) },
       network: ctx.network === 'allowlist' ? { allowedDomains: ctx.allowedDomains, strictAllowlist: true } : {},
     },
