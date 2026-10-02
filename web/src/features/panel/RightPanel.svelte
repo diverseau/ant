@@ -12,7 +12,7 @@
   })
 </script>
 
-<aside class="right" aria-hidden={!app.panel} inert={!app.panel}>
+<aside class="right" class:open={!!app.panel} aria-hidden={!app.panel} inert={!app.panel}>
   <div class="inner">
     <div class="head">
       <div class="tabs" role="tablist">
@@ -38,6 +38,28 @@
     overflow: hidden;
     background: var(--bg-sidebar);
     border-left: 1px solid var(--border);
+  }
+
+  @media (max-width: 960px) {
+    .right {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 30;
+      width: min(var(--panel-w), 92vw);
+      transform: translateX(102%);
+      transition: transform 380ms var(--ease-out);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .right.open {
+      transform: none;
+    }
+
+    .right .inner {
+      width: 100%;
+    }
   }
 
   .inner {

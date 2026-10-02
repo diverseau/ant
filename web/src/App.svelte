@@ -115,4 +115,11 @@
       --rp: min(var(--panel-w), 46vw);
     }
   }
+
+  /* Narrow screens: the right panel slides over the chat instead of squeezing it. */
+  @media (max-width: 960px) {
+    .shell.panel {
+      --rp: 0px;
+    }
+  }
 </style>
