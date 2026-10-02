@@ -1,0 +1,122 @@
+<script lang="ts">
+  import Ant from '../../lib/ant/Ant.svelte'
+  import { parse, type Inline } from '../../lib/rich'
+  import { app, select } from '../../lib/store.svelte'
+
+  let { text, streaming = false }: { text: string; streaming?: boolean } = $props()
+
+  const blocks = $derived(parse(text, app.ants))
+</script>
+
+{#snippet inl(parts: Inline[], last: boolean)}
+  {#each parts as p}
+    {#if p.t === 'text'}{#each p.v.split('\n') as line, li}{#if li}<br />{/if}{line}{/each}{:else if p.t === 'bold'}<strong>{p.v}</strong>{:else if p.t === 'code'}<code>{p.v}</code>{:else if p.t === 'tag'}<span class="tag">{p.v}</span>{:else if p.t === 'mention'}<button class="mention" onclick={() => select(p.ant.id)}><Ant color={p.ant.color} size={17} />{p.ant.name}</button>{/if}
+  {/each}{#if last && streaming}<span class="caret"></span>{/if}
+{/snippet}
+
+<div class="rich">
+  {#each blocks as b, bi}
+    {#if b.t === 'p'}
+      <p>{@render inl(b.inl, bi === blocks.length - 1)}</p>
+    {:else}
+      <ul>
+        {#each b.items as item, ii}
+          <li>{@render inl(item, bi === blocks.length - 1 && ii === b.items.length - 1)}</li>
+        {/each}
+      </ul>
+    {/if}
+  {/each}
+  {#if !blocks.length && streaming}<p><span class="caret"></span></p>{/if}
+</div>
+
+<style>
+  .rich {
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.62;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  p + p,
+  p + ul,
+  ul + p {
+    margin-top: 0.7em;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.25em;
+  }
+
+  li {
+    padding-left: 0.2em;
+  }
+
+  li + li {
+    margin-top: 0.3em;
+  }
+
+  li::marker {
+    color: var(--text-faint);
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  code {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.84em;
+    padding: 0.1em 0.38em;
+    border-radius: 5px;
+    background: rgb(255 255 255 / 0.07);
+    color: #f2c3b3;
+  }
+
+  .tag {
+    font-family: var(--font-ui);
+    font-size: 0.86em;
+    color: var(--accent);
+  }
+
+  .mention {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: -0.3em;
+    height: 1.55em;
+    padding: 0 8px 0 4px;
+    border-radius: var(--r-sm);
+    background: rgb(255 255 255 / 0.06);
+    font-family: var(--font-ui);
+    font-size: 0.82em;
+    font-weight: 500;
+    transition:
+      background var(--dur-fast),
+      transform var(--dur-fast) var(--ease-out);
+  }
+
+  .mention:hover {
+    background: rgb(255 255 255 / 0.11);
+    transform: translateY(-1px);
+  }
+
+  .caret {
+    display: inline-block;
+    width: 0.5em;
+    height: 0.5em;
+    margin-left: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: 0.05em;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      transform: scale(0.6);
+      opacity: 0.5;
+    }
+  }
+</style>

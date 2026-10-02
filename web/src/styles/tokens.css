@@ -1,0 +1,95 @@
+/* Design tokens. Neutrals and accent sampled from claude.ai (docs/refs/claude-*.png),
+   ant colours sampled from docs/refs/ant-inspo.png. Dark only. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg-app: #151515;
+  --bg-sidebar: #111111;
+  --bg-input: #1d1d1d;
+  --bg-raised: #20201f;
+  --bg-bubble: #232322;
+  --bg-hover: #1f1f1e;
+  --bg-active: #2b2b2a;
+  --bg-selected: #343434;
+  --bg-overlay: rgb(8 8 8 / 0.6);
+
+  /* Lines */
+  --border: #292929;
+  --border-strong: #3a3a39;
+  --border-focus: rgb(217 119 87 / 0.55);
+
+  /* Text */
+  --text: #f0efec;
+  --text-soft: #c3c2b7;
+  --text-muted: #898781;
+  --text-faint: #6f6e69;
+
+  /* Brand (brand-guidelines skill) */
+  --accent: #d97757;
+  --accent-hover: #e2876a;
+  --accent-soft: rgb(217 119 87 / 0.14);
+  --brand-blue: #6a9bcc;
+  --brand-green: #788c5d;
+
+  /* Status */
+  --ok: #42c28e;
+  --warn: #f2b13c;
+  --warn-soft: rgb(242 177 60 / 0.14);
+  --danger: #e5604f;
+  --unread: #3d8bff;
+
+  /* Ant palette */
+  --ant-coral: #ff735c;
+  --ant-purple: #8870e1;
+  --ant-yellow: #fac93e;
+  --ant-green: #42c28e;
+  --ant-blue: #16abff;
+  --ant-eye: #fdfbf9;
+  --ant-pupil: #151515;
+  --leaf: #77bf4b;
+
+  /* Type */
+  --font-ui: 'Poppins', Arial, system-ui, sans-serif;
+  --font-body: 'Lora Variable', 'Lora', Georgia, serif;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+
+  /* Shape */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 22px;
+  --r-full: 999px;
+
+  /* Layout */
+  --sidebar-w: 286px;
+  --sidebar-w-collapsed: 64px;
+  --panel-w: 440px;
+  --column-w: 720px;
+
+  /* Depth */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55), 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --shadow-lg: 0 24px 60px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.05);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%, 1.067, 1.096 24.2%, 1.099, 1.088 28.6%, 1.04 33.9%, 1.009 39.6%, 0.995 46.2%, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 340ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur: 1ms;
+    --dur-slow: 1ms;
+  }
+}
