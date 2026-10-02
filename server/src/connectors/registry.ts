@@ -115,6 +115,17 @@ export class Registry {
     if (patch.antIds) R.setSecretScopes(this.db, id, patch.antIds)
   }
 
+  /** Decrypted value for antd's own use (channel bot tokens). Never exposed over the API. */
+  secretValue(name: string): string | null {
+    const s = R.getSecretByName(this.db, name.trim().toUpperCase())
+    if (!s) return null
+    try {
+      return this.vault.decrypt(s.ciphertext)
+    } catch {
+      return null
+    }
+  }
+
   removeSecret(id: string) {
     if (!R.deleteSecret(this.db, id)) throw new HttpError(404, 'No such secret')
   }

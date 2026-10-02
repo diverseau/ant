@@ -11,6 +11,8 @@ import { Scheduler } from './scheduler/runtime.ts'
 import { AntService } from './service.ts'
 import { Registry } from './connectors/registry.ts'
 import { Vault } from './secrets/vault.ts'
+import { ChannelHub } from './channels/hub.ts'
+import type { ChannelAdapter, ChannelKind } from './channels/types.ts'
 import { registerTools } from './tools.ts'
 
 const cfg = loadConfig()
@@ -25,6 +27,14 @@ svc.registry = new Registry(db, vault)
 const broker = new Broker(svc)
 const scheduler = new Scheduler(svc)
 svc.routineViews = () => scheduler.list()
+const channels = new ChannelHub(
+  svc,
+  async (kind: ChannelKind, token: string): Promise<ChannelAdapter> => {
+    const mod = await import(`./channels/${kind}.ts`)
+    return mod.createAdapter(token)
+  },
+  (name) => svc.registry!.secretValue(name),
+)
 registerTools(svc, broker, scheduler)
 
 function which(bin: string): boolean {
@@ -63,10 +73,12 @@ function health(): Health {
 }
 
 await ipc.listen()
-const server = startHttp(svc, broker, scheduler, health)
+const server = startHttp(svc, broker, scheduler, channels, health)
+void channels.startAll()
 console.log(`antd ${cfg.version} on http://${cfg.host}:${cfg.port} · ants in ${cfg.antHome}`)
 
 function shutdown() {
+  void channels.shutdown()
   scheduler.shutdown()
   svc.shutdown()
   broker.shutdown()

@@ -8,6 +8,7 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { Broker } from '../broker.ts'
 import type { Scheduler } from '../scheduler/runtime.ts'
+import type { ChannelHub } from '../channels/hub.ts'
 import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
@@ -27,7 +28,7 @@ const createAnt = z.object({
 })
 const patchAnt = createAnt.partial().extend({ status: z.enum(['idle', 'paused']).optional() })
 
-export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler, health: () => Health) {
+export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler, channels: ChannelHub, health: () => Health) {
   const app = new Hono()
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
 
@@ -220,6 +221,19 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     reg().removeSecret(c.req.param('id'))
     changed()
     return c.json(connectorsView())
+  })
+
+  // Channels: chat with ants from Telegram / Discord / Slack.
+  app.get('/api/channels', (c) => c.json(channels.statuses()))
+  app.put('/api/channels/:kind', async (c) => {
+    const kind = z.enum(['telegram', 'discord', 'slack']).parse(c.req.param('kind'))
+    const b = await body(c, z.object({ enabled: z.boolean(), tokenSecret: z.string().min(1), allowUsers: z.array(z.string().min(1)).min(1, 'Add at least one allowed user id') }))
+    await channels.configure({ kind, ...b })
+    return c.json(channels.statuses())
+  })
+  app.delete('/api/channels/:kind', async (c) => {
+    await channels.remove(z.enum(['telegram', 'discord', 'slack']).parse(c.req.param('kind')))
+    return c.json(channels.statuses())
   })
 
   // Routines
