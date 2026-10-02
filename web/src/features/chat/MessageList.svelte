@@ -153,11 +153,10 @@
             <div class="content">
               {#if m.kind === 'text'}
                 <div class="bubble" class:mine={m.author === 'user'}>
-                  {@const att = m.author === 'user' ? splitAttached(m.text) : null}
-                  <RichText text={att ? att.text : m.text} streaming={m.streaming} />
-                  {#if att?.files.length}
+                  <RichText text={m.author === 'user' ? (splitAttached(m.text)?.text ?? m.text) : m.text} streaming={m.streaming} />
+                  {#if m.author === 'user' && splitAttached(m.text)}
                     <div class="att">
-                      {#each att.files as f}
+                      {#each splitAttached(m.text)?.files ?? [] as f}
                         <button class="att-chip" onclick={() => openAttachment(f)}><Paperclip size={12} />{f.split('/').pop()}</button>
                       {/each}
                     </div>
