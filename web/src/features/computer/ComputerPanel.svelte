@@ -6,8 +6,12 @@
   import { cubicOut } from 'svelte/easing'
   import Ant from '../../lib/ant/Ant.svelte'
   import { rise } from '../../lib/motion'
-  import { antById, app, threadById } from '../../lib/store.svelte'
+  import Globe from '@lucide/svelte/icons/globe'
+  import Play from '@lucide/svelte/icons/play'
+  import { api } from '../../lib/api'
+  import { antById, app, setLease, startComputer, threadById } from '../../lib/store.svelte'
   import FakeScreen from './FakeScreen.svelte'
+  import LiveScreen from './LiveScreen.svelte'
 
   const thread = $derived(threadById(app.selectedId))
   const antId = $derived(
@@ -17,6 +21,21 @@
   const card = $derived(thread?.messages.findLast((m) => m.kind === 'computer'))
   const live = $derived(!app.takeover && (card?.kind === 'computer' && card.state === 'working'))
   const site = $derived(card?.kind === 'computer' ? card.site : 'about:blank')
+
+  // Live mode: real browser state for this ant.
+  const comp = $derived(ant ? app.computers[ant.id] : undefined)
+  const control = $derived(comp?.lease === 'user')
+  let opened = $state(false)
+  const browserSteps = $derived(
+    (thread?.messages ?? []).filter((m) => m.kind === 'tool' && m.name.startsWith('mcp__browser__') && m.author === ant?.id).slice(-8),
+  )
+
+  $effect(() => {
+    if (app.mode !== 'live' || !ant) return
+    const id = ant.id
+    opened = false
+    api.computer(id).then((s) => (app.computers[id] = s)).catch(() => {})
+  })
 
   const steps = ['Opened browser', 'Signed in with saved session', 'Navigated to checkout', 'Clicked "Pay now"', 'Captured console output']
   let shown = $state(1)
@@ -30,6 +49,59 @@
 </script>
 
 <div class="panel">
+  {#if app.mode === 'live' && ant}
+    <div class="head">
+      <Ant color={ant.color} size={22} status={ant.status} />
+      <div class="grow">
+        <div class="title">{ant.name}'s computer</div>
+        <div class="sub">{control ? 'You are in control' : comp?.running ? (ant.status === 'working' ? 'Working' : 'Ready') : 'Browser asleep'}</div>
+      </div>
+    </div>
+
+    {#if comp?.running || opened}
+      <div class="urlbar"><Globe size={13} /><span>{comp?.url && comp.url !== 'about:blank' ? comp.url.replace(/^https?:\/\//, '') : 'New tab'}</span></div>
+      <div class="screen-wrap" class:control>
+        <LiveScreen antId={ant.id} {control} />
+        {#if control}
+          <div class="banner" transition:slide={{ duration: 240, easing: cubicOut }}>
+            <Hand size={14} /> You're in control. {ant.name} waits until you're done.
+          </div>
+        {/if}
+      </div>
+      <div class="actions">
+        {#if control}
+          <button class="btn btn-primary" onclick={() => setLease(ant.id, 'ant')} in:rise={{ y: 4, duration: 200 }}>
+            <CheckCircle size={15} /> I'm done
+          </button>
+        {:else}
+          <button class="btn btn-ghost" onclick={() => setLease(ant.id, 'user')} in:rise={{ y: 4, duration: 200 }}>
+            <Hand size={15} /> Take over
+          </button>
+        {/if}
+      </div>
+    {:else}
+      <div class="empty">
+        <div class="empty-screen">
+          <span>{ant.name}'s browser is asleep. It wakes when {ant.name} needs it.</span>
+          <button class="btn btn-ghost wake" onclick={() => { opened = true; startComputer(ant.id) }}><Play size={14} /> Open browser</button>
+        </div>
+        <p>Logins you make here stay in {ant.name}'s own browser profile, so it can keep using them.</p>
+      </div>
+    {/if}
+
+    {#if browserSteps.length}
+      <div class="log">
+        <div class="log-title">Recent browser activity</div>
+        <ol>
+          {#each browserSteps as s (s.id)}
+            {#if s.kind === 'tool'}
+              <li in:rise={{ y: 6 }}><span class="dot" class:current={s.state === 'running'}></span>{s.title}</li>
+            {/if}
+          {/each}
+        </ol>
+      </div>
+    {/if}
+  {:else}
   <div class="head">
     {#if ant}<Ant color={ant.color} size={22} status={live ? 'working' : 'idle'} />{/if}
     <div>
@@ -78,6 +150,7 @@
     </ol>
   </div>
   {/if}
+  {/if}
 </div>
 
 <style>
@@ -92,6 +165,34 @@
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  .grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .urlbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 11px;
+    border-radius: var(--r-full);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .urlbar span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .wake {
+    margin-top: 12px;
   }
 
   .title {
@@ -135,8 +236,10 @@
   }
 
   .empty-screen {
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     aspect-ratio: 16 / 10;
     border-radius: var(--r-md);
     border: 1px dashed var(--border-strong);

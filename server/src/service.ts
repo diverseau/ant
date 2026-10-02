@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, UsageWindows } from '@ant/shared'
 import { LoopGuard } from './colony/loop-guard.ts'
+import { ComputerManager } from './computer/manager.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/index.ts'
 import * as R from './db/repos/index.ts'
@@ -50,6 +51,7 @@ export class AntService {
   private queues = new Map<string, Turn[]>()
   private loopGuard = new LoopGuard()
   private activity = new Map<string, string>()
+  readonly computers: ComputerManager
   private reaper: NodeJS.Timeout
   readonly db: Db
   readonly cfg: Config
@@ -62,6 +64,7 @@ export class AntService {
     this.ipc = ipc
     this.userName = R.getSetting(db, 'user.name', process.env.ANT_USER_NAME ?? 'Leon')
     this.reaper = setInterval(() => this.reapIdle(), 30_000)
+    this.computers = new ComputerManager((state) => this.emit({ type: 'computer', state }))
     // Anything left "working" from a previous antd run is no longer working.
     for (const a of R.listAnts(db)) if (a.status === 'working') R.updateAnt(db, a.id, { status: 'idle' })
   }
@@ -161,6 +164,7 @@ export class AntService {
   deleteAnt(id: string) {
     this.antRow(id)
     this.stopAnt(id)
+    this.computers.stop(id)
     const t = R.getThreadByRef(this.db, 'ant', id)
     if (t) {
       R.deleteThread(this.db, t.id)
@@ -303,7 +307,23 @@ export class AntService {
       },
       token,
       all.filter((a) => a.id !== antId).map((a) => antPaths(this.cfg, { id: a.id, slug: a.slug }).folder),
+      this.cdpPort(antId),
     )
+  }
+
+  /** A stable CDP port per ant, so its MCP config can name it before Chromium starts. */
+  cdpPort(antId: string): number {
+    const known = R.getSetting<number | null>(this.db, `ant.${antId}.cdpPort`, null)
+    if (known) return known
+    const used = new Set(R.listAnts(this.db, { includeArchived: true }).map((a) => R.getSetting<number | null>(this.db, `ant.${a.id}.cdpPort`, null)))
+    let port = 9400
+    while (used.has(port)) port++
+    R.setSetting(this.db, `ant.${antId}.cdpPort`, port)
+    return port
+  }
+
+  ensureComputer(antId: string) {
+    return this.computers.ensure(antId, this.pathsFor(antId).folder, this.cdpPort(antId))
   }
 
   private ensureProcess(antId: string): Live {
@@ -623,6 +643,7 @@ export class AntService {
 
   shutdown() {
     clearInterval(this.reaper)
+    this.computers.shutdown()
     for (const id of [...this.live.keys()]) this.stopAnt(id)
   }
 }

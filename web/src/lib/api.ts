@@ -1,5 +1,5 @@
 // Client for antd: REST calls and the live event stream.
-import type { AntEvent, ApprovalDecision, Bootstrap, CreateAntInput } from '@ant/shared'
+import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput } from '@ant/shared'
 
 export class ApiError extends Error {
   status: number
@@ -34,6 +34,9 @@ export const api = {
   pin: (threadId: string, pinned: boolean) => req('PATCH', `/api/threads/${threadId}`, { pinned }),
   decide: (approvalId: string, decision: ApprovalDecision) => req('POST', `/api/approvals/${approvalId}`, { decision }),
   draft: (messageId: string, action: 'send' | 'discard', body?: string) => req('POST', `/api/messages/${messageId}/draft`, { action, body }),
+  computer: (antId: string) => req<ComputerState>('GET', `/api/ants/${antId}/computer`),
+  startComputer: (antId: string) => req<ComputerState>('POST', `/api/ants/${antId}/computer/start`),
+  lease: (antId: string, holder: 'ant' | 'user') => req<ComputerState>('POST', `/api/ants/${antId}/computer/lease`, { holder }),
 }
 
 /** Reconnecting event stream. Calls `onOpen` after every (re)connect so callers can resync. */

@@ -5,13 +5,16 @@
   import Clock from '@lucide/svelte/icons/clock'
   import { slide } from 'svelte/transition'
   import { cubicOut } from 'svelte/easing'
-  import { decideApproval } from '../../../lib/store.svelte'
+  import Monitor from '@lucide/svelte/icons/monitor'
+  import { app, decideApproval, setLease } from '../../../lib/store.svelte'
   import type { ApprovalMessage } from '../../../lib/types'
 
   let { m, threadId }: { m: ApprovalMessage; threadId: string } = $props()
 
   const result = $derived(
-    m.decision === 'once'
+    m.decision === 'once' && m.behaviour === 'handoff'
+      ? { icon: Check, text: 'Handed back', tone: 'ok' }
+      : m.decision === 'once'
       ? { icon: Check, text: 'Allowed once', tone: 'ok' }
       : m.decision === 'always'
         ? { icon: Check, text: `Always allowed for ${m.connector}`, tone: 'ok' }
@@ -26,12 +29,23 @@
 <div class="card" class:pending={!m.decision}>
   <div class="head">
     <span class="icon"><Shield size={15} /></span>
-    <span class="kicker">{m.decision ? 'Approval' : 'Needs your approval'}</span>
+    <span class="kicker">{m.behaviour === 'handoff' ? (m.decision ? 'Hand-off' : 'Needs you on the computer') : m.decision ? 'Approval' : 'Needs your approval'}</span>
   </div>
   <p class="action">{m.action}</p>
   <p class="detail">{m.detail}</p>
 
-  {#if !m.decision}
+  {#if !m.decision && m.behaviour === 'handoff'}
+    <div class="actions" out:slide={{ duration: 220, easing: cubicOut }}>
+      <button class="btn btn-ghost" onclick={() => decideApproval(threadId, m.id, 'deny')}>Not now</button>
+      <button
+        class="btn btn-accent"
+        onclick={() => {
+          app.panel = 'computer'
+          setLease(m.author, 'user')
+        }}><Monitor size={14} /> Take over</button
+      >
+    </div>
+  {:else if !m.decision}
     <div class="actions" out:slide={{ duration: 220, easing: cubicOut }}>
       <button class="btn btn-ghost" onclick={() => decideApproval(threadId, m.id, 'deny')}>Deny</button>
       <button class="btn btn-ghost" onclick={() => decideApproval(threadId, m.id, 'always')}>Always allow</button>

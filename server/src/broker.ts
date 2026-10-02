@@ -82,6 +82,36 @@ export class Broker {
     return `${this.svc.userName} declined. Don't do it.`
   }
 
+  /** The ant needs the user at the browser (sign-in, 2FA, CAPTCHA, payment). Resolves when they hand back. */
+  async requestHandoff(antId: string, reason: string): Promise<string> {
+    const svc = this.svc
+    const threadId = svc.threadForAnt(antId)
+    await svc.ensureComputer(antId).catch(() => {})
+    const approval = R.createApproval(svc.db, { antId, threadId, toolName: 'request_handoff', input: { reason }, behaviour: 'handoff', expiresAt: null })
+    const msg = svc.insert(threadId, antId, 'approval', {
+      approvalId: approval.id,
+      action: reason || 'Needs you on the computer',
+      detail: 'Open the computer, take over, and press I\'m done when finished.',
+      connector: 'Computer',
+      behaviour: 'handoff',
+    })
+    R.setApprovalMessage(svc.db, approval.id, msg.id)
+    svc.setStatus(antId, 'attention')
+    svc.emit({ type: 'notice', level: 'warn', text: `${R.getAnt(svc.db, antId)?.name ?? 'An ant'} needs you on its computer` })
+    const decision = await new Promise<ApprovalDecision>((resolve) => this.waiters.set(approval.id, resolve))
+    if (decision === 'deny') return `${svc.userName} declined to take over. Continue without it or explain what's blocked.`
+    return `${svc.userName} finished on the computer and handed it back. Check the page state and carry on.`
+  }
+
+  /** Called when the user hands the computer back: completes any open hand-off. */
+  completeHandoffs(antId: string) {
+    for (const a of R.listApprovals(this.svc.db, { status: 'pending', antId })) {
+      // An explicit hand-off is done; a tool that needed the user is now theirs, so it's not run.
+      if (a.toolName === 'request_handoff') this.finalise(a.id, 'once')
+      else if (a.behaviour === 'handoff') this.finalise(a.id, 'deny')
+    }
+  }
+
   private ask(
     antId: string,
     a: { toolName: string; input: unknown; behaviour: 'ask' | 'handoff'; action: string; detail: string; connector: string },

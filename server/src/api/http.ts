@@ -112,6 +112,53 @@ export function startHttp(svc: AntService, broker: Broker, health: () => Health)
     return c.body(null, 204)
   })
 
+  app.get('/api/ants/:id/computer', (c) => c.json(svc.computers.state(svc.antRow(c.req.param('id')).id)))
+  app.post('/api/ants/:id/computer/start', async (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    await svc.ensureComputer(id)
+    return c.json(svc.computers.state(id))
+  })
+  app.post('/api/ants/:id/computer/lease', async (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const b = await body(c, z.object({ holder: z.enum(['ant', 'user']) }))
+    if (b.holder === 'user') await svc.ensureComputer(id)
+    const was = svc.computers.lease(id)
+    svc.computers.setLease(id, b.holder)
+    if (was === 'user' && b.holder === 'ant') {
+      svc.system(svc.antThread(id).id, `You handed the computer back`)
+      broker.completeHandoffs(id)
+    }
+    return c.json(svc.computers.state(id))
+  })
+
+  app.get(
+    '/ws/ants/:id/screen',
+    upgradeWebSocket((c) => {
+      const antId = c.req.param('id') ?? ''
+      let stop: (() => void) | null = null
+      return {
+        async onOpen(_e, ws) {
+          try {
+            const id = svc.antRow(antId).id
+            stop = await svc.computers.watch(id, svc.pathsFor(id).folder, svc.cdpPort(id), (f) => ws.send(JSON.stringify({ type: 'frame', ...f })))
+          } catch (err) {
+            ws.send(JSON.stringify({ type: 'error', message: err instanceof Error ? err.message : String(err) }))
+          }
+        },
+        onMessage(e) {
+          try {
+            void svc.computers.input(antId, JSON.parse(String(e.data))).catch(() => {})
+          } catch {
+            // ignore malformed input
+          }
+        },
+        onClose() {
+          stop?.()
+        },
+      }
+    }),
+  )
+
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)

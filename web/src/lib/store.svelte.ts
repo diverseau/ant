@@ -1,4 +1,4 @@
-import type { AntEvent, Health, UsageWindows } from '@ant/shared'
+import type { AntEvent, ComputerState, Health, UsageWindows } from '@ant/shared'
 import { api, connectEvents } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
@@ -34,6 +34,7 @@ export const app = $state({
   usage: null as UsageWindows | null,
   health: null as Health | null,
   notices: [] as Notice[],
+  computers: {} as Record<string, ComputerState>,
 })
 
 const live = () => app.mode === 'live'
@@ -218,6 +219,9 @@ function apply(e: AntEvent) {
     case 'notice':
       notify(e.text, e.level)
       break
+    case 'computer':
+      app.computers[e.state.antId] = e.state
+      break
   }
 }
 
@@ -377,6 +381,23 @@ export async function createAnt(input: { name: string; label?: string; descripti
   app.threads.push({ id, kind: 'ant', refId: id, unread: 0, pinned: false, updatedAt: Date.now(), messages: [] })
   select(id)
   return id
+}
+
+export async function startComputer(antId: string) {
+  try {
+    app.computers[antId] = await api.startComputer(antId)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function setLease(antId: string, holder: 'ant' | 'user') {
+  try {
+    app.computers[antId] = await api.lease(antId, holder)
+    app.takeover = holder === 'user'
+  } catch (err) {
+    fail(err)
+  }
 }
 
 export function setStatus(antId: string, status: Ant['status']) {

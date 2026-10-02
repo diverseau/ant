@@ -83,6 +83,16 @@ server.registerTool(
 )
 
 server.registerTool(
+  'request_handoff',
+  {
+    description:
+      'Ask the user to take over your browser for something only they should do: signing in, 2FA, CAPTCHAs, payment details. Blocks until they hand the browser back, then continue from the current page.',
+    inputSchema: { reason: z.string().describe('What they need to do, e.g. "Sign in to Salesforce"') },
+  },
+  (args) => call('request_handoff', args),
+)
+
+server.registerTool(
   'set_status',
   { description: 'Set a short live status line shown next to your name, e.g. "Pulling the Salesforce list".', inputSchema: { text: z.string().max(80) } },
   (args) => call('set_status', args),

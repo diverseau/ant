@@ -31,6 +31,7 @@ export interface ProvisionContext {
 
 const ANT_MCP_MAIN = fileURLToPath(new URL('../../../packages/ant-mcp/src/main.ts', import.meta.url))
 const ANT_HOOK = fileURLToPath(new URL('../../../packages/ant-mcp/src/hook.ts', import.meta.url))
+const PLAYWRIGHT_MCP = fileURLToPath(new URL('../../../node_modules/@playwright/mcp/cli.js', import.meta.url))
 
 export function slugify(name: string): string {
   const s = name
@@ -95,6 +96,7 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
         'WebSearch',
         ...(ctx.network === 'open' ? ['WebFetch(domain:*)'] : ['WebFetch', ...ctx.allowedDomains.map((d) => `WebFetch(domain:${d})`)]),
         'mcp__ant__*',
+        'mcp__browser__*',
         'TodoWrite',
         'Task',
         'Skill',
@@ -116,10 +118,16 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
   }
 }
 
-export function mcpConfigFor(cfg: Config, token: string) {
+export function mcpConfigFor(cfg: Config, token: string, paths: AntPaths, cdpPort: number) {
   return {
     mcpServers: {
       ant: { command: 'node', args: [ANT_MCP_MAIN], env: { ANT_SOCKET: cfg.socketPath, ANT_TOKEN: token } },
+      // The ant's own Chromium, started on demand by antd (PreToolUse hook) and shared with
+      // the user's take-over view.
+      browser: {
+        command: 'node',
+        args: [PLAYWRIGHT_MCP, '--cdp-endpoint', `http://127.0.0.1:${cdpPort}`, '--output-dir', join(paths.workspace, 'browser')],
+      },
     },
   }
 }
@@ -148,6 +156,7 @@ ${ant.description.trim()}
 - Anything that would be sent to a person (email, Slack, DM) goes through \`present_draft\`. Never send it another way.
 - Before purchases, payments, deletions, publishing, or any browser action with real-world effect, call \`request_approval\` and wait.
 - Use \`set_status\` for a short live status while you work on something long.
+- You have your own browser (the \`browser_*\` tools). Logins you make there persist. When a site needs ${ctx.userName} to sign in, pass 2FA or a CAPTCHA, or enter payment details, call \`request_handoff\` and wait; never ask for passwords in chat.
 
 ## The colony
 ${roster}
@@ -172,7 +181,7 @@ function firstLine(s: string): string {
 }
 
 /** Create the folder layout (idempotent) and write generated files. */
-export function provisionAnt(cfg: Config, ant: Ant & { slug: string }, ctx: ProvisionContext, token: string, otherFolders: string[]): AntPaths {
+export function provisionAnt(cfg: Config, ant: Ant & { slug: string }, ctx: ProvisionContext, token: string, otherFolders: string[], cdpPort: number): AntPaths {
   const paths = antPaths(cfg, ant)
   for (const d of [paths.folder, join(paths.folder, 'memory'), paths.workspace, join(paths.folder, 'inbox'), join(paths.folder, 'browser'), join(paths.folder, '.claude', 'skills'), paths.dataDir]) {
     mkdirSync(d, { recursive: true, mode: d === paths.dataDir ? 0o700 : 0o755 })
@@ -180,7 +189,7 @@ export function provisionAnt(cfg: Config, ant: Ant & { slug: string }, ctx: Prov
   if (!existsSync(paths.memory)) writeFileSync(paths.memory, '')
   writeFileSync(paths.claudeMd, claudeMdFor(ant, paths, ctx))
   writeFileSync(paths.settings, JSON.stringify(settingsFor(cfg, paths, ctx, otherFolders), null, 2), { mode: 0o600 })
-  writeFileSync(paths.mcpConfig, JSON.stringify(mcpConfigFor(cfg, token), null, 2), { mode: 0o600 })
+  writeFileSync(paths.mcpConfig, JSON.stringify(mcpConfigFor(cfg, token, paths, cdpPort), null, 2), { mode: 0o600 })
   return paths
 }
 

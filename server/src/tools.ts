@@ -21,6 +21,7 @@ export function registerTools(svc: AntService, broker: Broker) {
 
   // PreToolUse floors (plan §4). Hardline patterns land with the rules-patterns port.
   ipc.on('pretool', (antId, p) => floors.check(svc, antId, p))
+  ipc.on('request_handoff', (antId, p) => broker.requestHandoff(antId, str(p.reason)))
 
   ipc.on('report_checklist', (antId, p) => {
     const items = Array.isArray(p.items) ? p.items : []
@@ -86,7 +87,19 @@ export function registerTools(svc: AntService, broker: Broker) {
 
 export const floors = {
   /** Hardline command floors + (later) the computer lease (plan §4). */
-  check(svc: AntService, antId: string, p: P): { action: 'block' | 'ask' | 'pass'; message?: string } {
+  async check(svc: AntService, antId: string, p: P): Promise<{ action: 'block' | 'ask' | 'pass'; message?: string }> {
+    const tool = str(p.tool_name)
+    if (tool.startsWith('mcp__browser__')) {
+      // Fail closed while the user drives: they may be typing a password (Hermes lease rule).
+      if (svc.computers.lease(antId) === 'user') return { action: 'block', message: `${svc.userName} is using your browser right now. Wait for them to hand it back; you'll get a message.` }
+      try {
+        await svc.ensureComputer(antId)
+      } catch (err) {
+        return { action: 'block', message: `Your browser couldn't start: ${err instanceof Error ? err.message : String(err)}` }
+      }
+      const risky = riskyBrowserAction(tool, (p.tool_input ?? {}) as P)
+      if (risky) return { action: 'ask', message: risky }
+    }
     if (p.tool_name === 'Bash') {
       const input = (p.tool_input ?? {}) as P
       const v = evaluateFloors(str(input.command), { cwd: svc.pathsFor(antId).folder, home: process.env.HOME })
@@ -95,6 +108,18 @@ export const floors = {
     }
     return { action: 'pass' }
   },
+}
+
+const RISKY_CLICK = /\b(buy|purchase|pay|place order|checkout|check out|confirm order|subscribe|send|submit|delete|remove|transfer|publish|post|sign up|book now|reserve)\b/i
+
+/** Browser clicks aren't classifiable by tool name; look at what's being clicked (plan §4). */
+function riskyBrowserAction(tool: string, input: P): string | null {
+  if (!/browser_(click|press_key|type|fill_form|select_option|file_upload)/.test(tool)) return null
+  const text = [input.element, input.ref, input.text, input.key, JSON.stringify(input.fields ?? '')].map(str).join(' ')
+  if (tool.endsWith('file_upload')) return 'Uploading a file to a website'
+  if (/press_key|type/.test(tool) && !/enter|submit/i.test(text + str(input.submit))) return null
+  const m = text.match(RISKY_CLICK)
+  return m ? `Browser action that may have real-world effect ("${m[0]}")` : null
 }
 
 /* ---------- memory ---------- */

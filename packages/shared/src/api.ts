@@ -26,6 +26,15 @@ export interface UsageWindows {
   updatedAt: number
 }
 
+export interface ComputerState {
+  antId: string
+  running: boolean
+  url: string | null
+  title: string | null
+  /** Who drives the browser: the ant, or the user after "Take over". */
+  lease: 'ant' | 'user'
+}
+
 export interface CreateAntInput {
   name: string
   label?: string
@@ -51,4 +60,5 @@ export type AntEvent =
   | { type: 'colony.updated'; colony: Colony }
   | { type: 'typing'; threadId: string; antId: string | null }
   | { type: 'usage'; usage: UsageWindows }
+  | { type: 'computer'; state: ComputerState }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string }
