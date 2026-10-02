@@ -2,6 +2,7 @@
   import Chat from './features/chat/Chat.svelte'
   import Connectors from './features/connectors/Connectors.svelte'
   import NewAnt from './features/creator/NewAnt.svelte'
+  import NewColony from './features/colony/NewColony.svelte'
   import Palette from './features/palette/Palette.svelte'
   import RightPanel from './features/panel/RightPanel.svelte'
   import Sidebar from './features/sidebar/Sidebar.svelte'
@@ -75,6 +76,8 @@
   <Palette />
 {:else if app.overlay === 'new-ant'}
   <NewAnt />
+{:else if app.overlay === 'new-colony'}
+  <NewColony />
 {:else if app.overlay === 'connectors'}
   <Connectors />
 {:else if app.overlay === 'settings'}

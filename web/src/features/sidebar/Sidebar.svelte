@@ -13,7 +13,7 @@
   import { Spring } from 'svelte/motion'
   import { mod } from '../../lib/format'
   import { collapse, rise } from '../../lib/motion'
-  import { app, deleteThread, sortedThreads, togglePin } from '../../lib/store.svelte'
+  import { app, deleteThread, select, sortedThreads, togglePin } from '../../lib/store.svelte'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
   import UsageRing from '../../lib/ui/UsageRing.svelte'
   import ThreadRow from './ThreadRow.svelte'
@@ -28,6 +28,29 @@
 
   let menu: { x: number; y: number; items: MenuItem[] } | null = $state(null)
   let renamingId: string | null = $state(null)
+  async function startRename(id: string) {
+    const t = sorted.find((t) => t.id === id)
+    if (t?.kind === 'colony') {
+      select(id)
+      app.panel = 'details'
+      await tick()
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Colony name"]')
+      input?.focus()
+      input?.select()
+    } else renamingId = id
+  }
+
+  function openCreateMenu(e: MouseEvent) {
+    const rect = e.currentTarget instanceof HTMLElement ? e.currentTarget.getBoundingClientRect() : null
+    menu = {
+      x: rect?.left ?? e.clientX,
+      y: rect?.bottom ?? e.clientY,
+      items: [
+        { label: 'New ant', onclick: () => (app.overlay = 'new-ant') },
+        { label: 'New colony', onclick: () => (app.overlay = 'new-colony') },
+      ],
+    }
+  }
 
   async function place(instant = false, tries = 0) {
     await tick()
@@ -69,7 +92,7 @@
       y: e.clientY,
       items: [
         { label: t.pinned ? 'Unpin' : 'Pin to top', icon: t.pinned ? PinOff : Pin, onclick: () => togglePin(id) },
-        { label: 'Rename', icon: Pencil, onclick: () => (renamingId = id) },
+        { label: 'Rename', icon: Pencil, onclick: () => startRename(id) },
         { label: 'Delete', icon: Trash, danger: true, onclick: () => deleteThread(id) },
       ],
     }
@@ -88,7 +111,7 @@
     </button>
     {#if !app.sidebarCollapsed}
       <span class="wordmark" in:rise={{ y: 4, duration: 260 }}>ant</span>
-      <button class="icon-btn new" aria-label="New ant" title="New ant ({mod}+N)" onclick={() => (app.overlay = 'new-ant')}>
+      <button class="icon-btn new" aria-label="New ant or colony" aria-haspopup="menu" title="New ant or colony" onclick={openCreateMenu}>
         <Plus size={18} />
       </button>
     {/if}
@@ -120,7 +143,7 @@
               collapsed={app.sidebarCollapsed}
               renaming={renamingId === t.id}
               onrenamed={() => (renamingId = null)}
-              onrequestrename={() => (renamingId = t.id)}
+              onrequestrename={() => startRename(t.id)}
               oncontext={(e) => openMenu(e, t.id)}
               bind:el={rows[t.id]}
             />
@@ -136,7 +159,7 @@
             collapsed={app.sidebarCollapsed}
             renaming={renamingId === t.id}
             onrenamed={() => (renamingId = null)}
-            onrequestrename={() => (renamingId = t.id)}
+            onrequestrename={() => startRename(t.id)}
             oncontext={(e) => openMenu(e, t.id)}
             bind:el={rows[t.id]}
           />

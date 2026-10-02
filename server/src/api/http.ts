@@ -73,6 +73,15 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.json(svc.createColony(b.name, b.memberIds), 201)
   })
 
+  app.patch('/api/colonies/:id', async (c) => {
+    const b = await body(c, z.object({ name: z.string().trim().min(1).max(60).optional(), memberIds: z.array(z.string()).optional(), leadAntId: z.string().optional() }))
+    return c.json(svc.updateColony(c.req.param('id'), b))
+  })
+  app.delete('/api/colonies/:id', (c) => {
+    svc.deleteColony(c.req.param('id'))
+    return c.body(null, 204)
+  })
+
   app.get('/api/threads/:id/messages', (c) => {
     const before = c.req.query('before')
     return c.json(R.listMessages(svc.db, c.req.param('id'), { before, limit: 50 }).map(toMessage))

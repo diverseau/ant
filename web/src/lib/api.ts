@@ -1,7 +1,8 @@
 // Client for antd: REST calls and the live event stream.
-import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
+import type { AntEvent, ApprovalDecision, Bootstrap, Colony, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
 export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled'>>
+export type ColonyPatch = { name?: string; memberIds?: string[]; leadAntId?: string }
 
 export class ApiError extends Error {
   status: number
@@ -29,7 +30,9 @@ export const api = {
   createAnt: (input: CreateAntInput) => req<Bootstrap['ants'][number]>('POST', '/api/ants', input),
   updateAnt: (id: string, patch: Record<string, unknown>) => req('PATCH', `/api/ants/${id}`, patch),
   deleteAnt: (id: string) => req('DELETE', `/api/ants/${id}`),
-  createColony: (name: string, memberIds: string[]) => req('POST', '/api/colonies', { name, memberIds }),
+  createColony: (name: string, memberIds: string[]) => req<Colony>('POST', '/api/colonies', { name, memberIds }),
+  updateColony: (id: string, patch: ColonyPatch) => req<Colony>('PATCH', `/api/colonies/${id}`, patch),
+  deleteColony: (id: string) => req<void>('DELETE', `/api/colonies/${id}`),
   send: (threadId: string, text: string) => req('POST', `/api/threads/${threadId}/messages`, { text }),
   stop: (threadId: string) => req('POST', `/api/threads/${threadId}/stop`),
   read: (threadId: string) => req('POST', `/api/threads/${threadId}/read`),

@@ -10,11 +10,15 @@
   import Pencil from '@lucide/svelte/icons/pencil'
   import Plus from '@lucide/svelte/icons/plus'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
+  import Crown from '@lucide/svelte/icons/crown'
+  import X from '@lucide/svelte/icons/x'
   import Ant from '../../lib/ant/Ant.svelte'
+  import AntStack from '../../lib/ant/AntStack.svelte'
+  import type { ColonyPatch } from '../../lib/api'
   import { skills as mockSkills } from '../../lib/mock/data'
   import { api } from '../../lib/api'
   import type { RuleView } from '@ant/shared'
-  import { app, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateRoutine } from '../../lib/store.svelte'
+  import { app, colonyById, deleteColony, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateColony, updateRoutine } from '../../lib/store.svelte'
   import { collapse, rise } from '../../lib/motion'
   import Switch from '../../lib/ui/Switch.svelte'
   import RoutineEditor from '../routines/RoutineEditor.svelte'
@@ -23,6 +27,50 @@
   const thread = $derived(threadById(app.selectedId))
   const members = $derived(thread ? threadMembers(thread) : [])
   const ant = $derived(thread?.kind === 'ant' ? members[0] : undefined)
+  const colony = $derived(thread?.kind === 'colony' ? colonyById(thread.refId) : undefined)
+  const available = $derived(app.ants.filter((a) => !colony?.memberIds.includes(a.id)))
+  let addingTo = $state<string | null>(null)
+  let deletingColony = $state<string | null>(null)
+
+  $effect(() => {
+    void app.selectedId
+    addingTo = null
+    deletingColony = null
+  })
+
+  async function editColony(id: string, patch: ColonyPatch) {
+    if (pending[id]) return
+    pending[id] = true
+    errors[id] = ''
+    try {
+      await updateColony(id, patch)
+      addingTo = null
+    } catch (err) {
+      errors[id] = err instanceof Error ? err.message : String(err)
+    } finally {
+      pending[id] = false
+    }
+  }
+
+  async function renameColony(e: Event, id: string) {
+    const input = e.currentTarget as HTMLInputElement
+    await editColony(id, { name: input.value.trim() })
+    input.value = colonyById(id)?.name ?? ''
+  }
+
+  async function removeColony(id: string) {
+    if (pending[id]) return
+    pending[id] = true
+    errors[id] = ''
+    try {
+      await deleteColony(id)
+      deletingColony = null
+    } catch (err) {
+      errors[id] = err instanceof Error ? err.message : String(err)
+    } finally {
+      pending[id] = false
+    }
+  }
 
   const routines = $derived(app.routines.filter((r) => r.antId === ant?.id))
   let demoRoutines = $state([
@@ -241,18 +289,53 @@
       </div>
       <button class="btn btn-danger" onclick={() => deleteThread(threadForAnt(ant.id)?.id ?? ant.id)}><Trash size={14} /> Delete ant</button>
     </section>
-  {:else if thread}
+  {:else if colony}
+    <div class="identity">
+      <div class="portrait"><AntStack ants={members} size={96} /></div>
+      <input class="name" value={colony.name} maxlength="60" disabled={pending[colony.id]} aria-label="Colony name" onchange={(e) => renameColony(e, colony.id)} />
+      <p class="hint">{members.length} ants · one shared chat</p>
+    </div>
+    {#if errors[colony.id]}<p class="routine-error" role="alert" in:rise>{errors[colony.id]}</p>{/if}
     <section>
-      <h3>Members</h3>
-      {#each members as m}
-        <button class="item row member" onclick={() => selectAnt(m.id)}>
-          <Ant color={m.color} size={28} status={m.status} />
-          <div>
-            <div>{m.name}</div>
-            <div class="sub">{m.label}</div>
+      <h3>Members · {members.length} / 6</h3>
+      {#each members as m (m.id)}
+        <div class="colony-member" in:rise>
+          <button class="item row member" onclick={() => selectAnt(m.id)}>
+            <Ant color={m.color} accessory={m.accessory} size={28} status={m.status} />
+            <div><div>{m.name}</div><div class="sub">{m.label}</div></div>
+          </button>
+          <div class="member-controls">
+            <button class="icon-btn lead" class:chosen={(colony.leadAntId ?? colony.memberIds[0]) === m.id} aria-pressed={(colony.leadAntId ?? colony.memberIds[0]) === m.id} aria-label="Make {m.name} lead" title={(colony.leadAntId ?? colony.memberIds[0]) === m.id ? `${m.name} is the lead` : `Make ${m.name} lead`} disabled={pending[colony.id]} onclick={() => editColony(colony.id, { leadAntId: m.id })}><Crown size={15} /></button>
+            <button class="icon-btn" aria-label="Remove {m.name}" title={members.length <= 2 ? 'A colony needs at least two ants' : `Remove ${m.name}`} disabled={pending[colony.id] || members.length <= 2} onclick={() => editColony(colony.id, { memberIds: colony.memberIds.filter((id) => id !== m.id) })}><X size={14} /></button>
           </div>
-        </button>
+        </div>
       {/each}
+      <p class="hint"><Crown size={12} /> Choose the lead with the crown. The lead replies when no ant is @mentioned.</p>
+      <button class="btn btn-ghost new-routine" disabled={pending[colony.id] || members.length >= 6 || !available.length} aria-expanded={addingTo === colony.id} onclick={() => addingTo = addingTo === colony.id ? null : colony.id}><Plus size={13} /> Add member</button>
+      {#if addingTo === colony.id}
+        <div class="member-picker" in:rise>
+          {#each available as m (m.id)}
+            <button class="item row member" disabled={pending[colony.id]} onclick={() => editColony(colony.id, { memberIds: [...colony.memberIds, m.id] })}>
+              <Ant color={m.color} accessory={m.accessory} size={28} status={m.status} />
+              <div><div>{m.name}</div><div class="sub">{m.label}</div></div>
+              <Plus size={13} />
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </section>
+    <section class="danger">
+      {#if deletingColony === colony.id}
+        <div class="confirm" in:rise>
+          <p>Delete “{colony.name}” and its chat history? Its ants will stay.</p>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost" disabled={pending[colony.id]} onclick={() => deletingColony = null}>Cancel</button>
+            <button class="btn btn-danger" disabled={pending[colony.id]} onclick={() => removeColony(colony.id)}>{pending[colony.id] ? 'Deleting…' : 'Delete colony'}</button>
+          </div>
+        </div>
+      {:else}
+        <button class="btn btn-danger" disabled={pending[colony.id]} onclick={() => deletingColony = colony.id}><Trash size={14} /> Delete colony</button>
+      {/if}
     </section>
   {/if}
 </div>
@@ -358,6 +441,16 @@
   .member:hover {
     background: var(--bg-hover);
   }
+
+  .colony-member { display: flex; align-items: center; gap: 8px; }
+  .colony-member .member { flex: 1; min-width: 0; margin: 0; }
+  .member-controls { display: flex; flex: none; gap: 4px; }
+  .lead.chosen { color: var(--accent); background: var(--accent-soft); }
+  .member-picker { margin-top: 8px; padding: 6px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-input); }
+  .member-picker .member { margin: 0; }
+  .member-picker .member > div { flex: 1; }
+  .member > div { min-width: 0; overflow-wrap: anywhere; }
+  .colony-member button:disabled, .member-picker button:disabled { opacity: 0.4; }
 
   .mono {
     font-family: ui-monospace, Menlo, monospace;

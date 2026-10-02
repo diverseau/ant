@@ -250,6 +250,43 @@ export class AntService {
     return toColony(c)
   }
 
+  updateColony(id: string, patch: { name?: string; memberIds?: string[]; leadAntId?: string }) {
+    const colony = R.getColony(this.db, id)
+    if (!colony) throw new HttpError(404, 'No such colony')
+    const memberIds = this.validateMembers(patch.memberIds ?? colony.memberIds)
+    const leadAntId = patch.leadAntId ?? (colony.leadAntId && memberIds.includes(colony.leadAntId) ? colony.leadAntId : memberIds[0])
+    if (!memberIds.includes(leadAntId)) throw new HttpError(400, 'The lead must be a member of the colony')
+    const name = patch.name === undefined ? colony.name : patch.name.trim()
+    if (!name || name.length > 60) throw new HttpError(400, 'A colony name must be between 1 and 60 characters')
+    const membershipChanged = memberIds.some((m) => !colony.memberIds.includes(m)) || colony.memberIds.some((m) => !memberIds.includes(m))
+    if (patch.memberIds !== undefined) R.setMembers(this.db, id, memberIds)
+    R.setLead(this.db, id, leadAntId)
+    // The colony repo exposes membership and lead setters; rename stays here.
+    this.db.prepare('UPDATE colonies SET name = ?, updated_at = ? WHERE id = ?').run(name, Date.now(), id)
+    const next = toColony(R.getColony(this.db, id)!)
+    this.emit({ type: 'colony.updated', colony: next })
+    const thread = R.getThreadByRef(this.db, 'colony', id)
+    if (thread && membershipChanged) this.system(thread.id, `Members updated: ${memberIds.map((m) => R.getAnt(this.db, m)!.name).join(', ')}`)
+    return next
+  }
+
+  deleteColony(id: string) {
+    if (!R.getColony(this.db, id)) throw new HttpError(404, 'No such colony')
+    const thread = R.getThreadByRef(this.db, 'colony', id)
+    if (thread) {
+      for (const [antId, q] of this.queues) this.queues.set(antId, q.filter((t) => t.threadId !== thread.id))
+      for (const [antId, l] of this.live) {
+        if (l.current?.threadId !== thread.id) continue
+        if (l.runId) R.updateRun(this.db, l.runId, { status: 'stopped', endedAt: Date.now() })
+        this.stopAnt(antId)
+        this.finishTurn(antId, l, false)
+      }
+      R.deleteThread(this.db, thread.id)
+    }
+    R.deleteColony(this.db, id)
+    if (thread) this.emit({ type: 'thread.deleted', threadId: thread.id })
+  }
+
   /* ---------------- messages ---------------- */
 
   insert(threadId: string, author: string, kind: string, payload: Record<string, unknown>, text = '', runId?: string | null): Message {

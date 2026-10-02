@@ -1,11 +1,11 @@
 import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, SkillView, UsageWindows } from '@ant/shared'
-import { api, connectEvents, type RoutinePatch } from './api'
+import { api, connectEvents, type ColonyPatch, type RoutinePatch } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
 import type { Accessory, Ant, AntColor, ApprovalMessage, DraftMessage, Message, Thread } from './types'
 
 export type Panel = 'computer' | 'details' | null
-export type Overlay = 'palette' | 'new-ant' | 'connectors' | 'usage' | 'settings' | null
+export type Overlay = 'palette' | 'new-ant' | 'new-colony' | 'connectors' | 'usage' | 'settings' | null
 /** `live` talks to antd; `demo` runs the scripted mock when antd isn't reachable. */
 export type Mode = 'connecting' | 'live' | 'demo'
 
@@ -212,6 +212,10 @@ function apply(e: AntEvent) {
       upsertThread(e.thread)
       break
     case 'thread.deleted': {
+      const t = threadById(e.threadId)
+      if (t?.kind === 'colony') app.colonies = app.colonies.filter((c) => c.id !== t.refId)
+      delete app.typing[e.threadId]
+      delete app.drafts[e.threadId]
       const i = app.threads.findIndex((t) => t.id === e.threadId)
       if (i >= 0) app.threads.splice(i, 1)
       if (app.selectedId === e.threadId) app.selectedId = sortedThreads()[0]?.id ?? ''
@@ -227,6 +231,7 @@ function apply(e: AntEvent) {
       const i = app.colonies.findIndex((c) => c.id === e.colony.id)
       if (i >= 0) app.colonies[i] = e.colony
       else app.colonies.push(e.colony)
+      if (threadById(app.selectedId)?.refId === e.colony.id) refreshSkills()
       break
     }
     case 'typing':
@@ -304,7 +309,8 @@ export async function routineRuns(id: string) {
 /** The ant whose skills apply to a thread: the ant itself, or a colony's lead. */
 function skillAnt(t: Thread | undefined): string | undefined {
   if (!t) return undefined
-  return t.kind === 'ant' ? t.refId : colonyById(t.refId)?.memberIds[0]
+  const colony = t.kind === 'colony' ? colonyById(t.refId) : undefined
+  return t.kind === 'ant' ? t.refId : colony?.leadAntId ?? colony?.memberIds[0]
 }
 
 export function refreshSkills() {
@@ -445,13 +451,94 @@ export function deleteThread(id: string) {
   if (!t) return
   if (live()) {
     if (t.kind === 'ant') api.deleteAnt(t.refId).catch(fail)
-    else notify('Deleting colonies is coming soon.')
+    else deleteColony(t.refId).catch(fail)
+    return
+  }
+  if (t.kind === 'colony') {
+    void deleteColony(t.refId)
     return
   }
   const i = app.threads.indexOf(t)
   const wasSelected = app.selectedId === id
   app.threads.splice(i, 1)
   if (wasSelected) app.selectedId = sortedThreads()[0]?.id ?? ''
+}
+
+function colonyMembers(ids: string[]): string[] {
+  const members = [...new Set(ids)]
+  if (members.length < 2 || members.length > 6) throw new Error('A colony needs between 2 and 6 ants')
+  if (members.some((id) => !antById(id))) throw new Error('Every member must be an existing ant')
+  return members
+}
+
+export async function createColony(input: { name: string; memberIds: string[]; leadAntId?: string }): Promise<string> {
+  const memberIds = colonyMembers(input.memberIds)
+  const name = input.name.trim()
+  if (!name || name.length > 60) throw new Error('A colony name must be between 1 and 60 characters')
+  const leadAntId = input.leadAntId ?? memberIds[0]
+  if (!memberIds.includes(leadAntId)) throw new Error('The lead must be a member of the colony')
+  // POST defaults the lead to the first member; preserve the chosen lead in that request.
+  const ordered = [leadAntId, ...memberIds.filter((id) => id !== leadAntId)]
+  if (live()) {
+    const colony = await api.createColony(name, ordered)
+    const i = app.colonies.findIndex((c) => c.id === colony.id)
+    if (i >= 0) app.colonies[i] = colony
+    else app.colonies.push(colony)
+    let thread = app.threads.find((t) => t.kind === 'colony' && t.refId === colony.id)
+    for (let i = 0; i < 20 && !thread; i++) {
+      await new Promise((r) => setTimeout(r, 50))
+      thread = app.threads.find((t) => t.kind === 'colony' && t.refId === colony.id)
+    }
+    if (!thread) {
+      await resync()
+      thread = app.threads.find((t) => t.kind === 'colony' && t.refId === colony.id)
+    }
+    if (!thread) throw new Error('Created colony, but its chat could not be loaded')
+    select(thread.id)
+    return colony.id
+  }
+  const id = uid('colony')
+  const threadId = uid('thread')
+  app.colonies.push({ id, name, memberIds: ordered, leadAntId })
+  app.threads.push({ id: threadId, kind: 'colony', refId: id, unread: 0, pinned: false, updatedAt: Date.now(), messages: [] })
+  push(threadId, { id: uid(), kind: 'system', author: 'system', text: `${ordered.map((id) => antById(id)!.name).join(', ')} formed ${name}`, at: Date.now() }, false)
+  select(threadId)
+  return id
+}
+
+export async function updateColony(id: string, patch: ColonyPatch) {
+  const colony = colonyById(id)
+  if (!colony) throw new Error('No such colony')
+  const memberIds = colonyMembers(patch.memberIds ?? colony.memberIds)
+  const name = (patch.name ?? colony.name).trim()
+  if (!name || name.length > 60) throw new Error('A colony name must be between 1 and 60 characters')
+  const leadAntId = patch.leadAntId ?? (colony.leadAntId && memberIds.includes(colony.leadAntId) ? colony.leadAntId : memberIds[0])
+  if (!memberIds.includes(leadAntId)) throw new Error('The lead must be a member of the colony')
+  if (live()) {
+    const next = await api.updateColony(id, patch)
+    const i = app.colonies.findIndex((c) => c.id === id)
+    if (i >= 0) app.colonies[i] = next
+  } else {
+    const changed = memberIds.some((m) => !colony.memberIds.includes(m)) || colony.memberIds.some((m) => !memberIds.includes(m))
+    // The scripted demo responder uses the first member as its lead.
+    Object.assign(colony, { name, memberIds: [leadAntId, ...memberIds.filter((m) => m !== leadAntId)], leadAntId })
+    const thread = app.threads.find((t) => t.kind === 'colony' && t.refId === id)
+    if (thread && changed) push(thread.id, { id: uid(), kind: 'system', author: 'system', text: `Members updated: ${memberIds.map((m) => antById(m)!.name).join(', ')}`, at: Date.now() }, false)
+  }
+  if (threadById(app.selectedId)?.refId === id) refreshSkills()
+}
+
+export async function deleteColony(id: string) {
+  if (live()) await api.deleteColony(id)
+  const threads = app.threads.filter((t) => t.kind === 'colony' && t.refId === id)
+  for (const thread of threads) {
+    if (!live()) stopEngine(thread.id)
+    delete app.typing[thread.id]
+    delete app.drafts[thread.id]
+  }
+  app.colonies = app.colonies.filter((c) => c.id !== id)
+  app.threads = app.threads.filter((t) => t.kind !== 'colony' || t.refId !== id)
+  if (!threadById(app.selectedId)) app.selectedId = sortedThreads()[0]?.id ?? ''
 }
 
 export async function createAnt(input: { name: string; label?: string; description: string; color: AntColor; accessory: Accessory }) {
