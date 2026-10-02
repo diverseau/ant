@@ -9,7 +9,7 @@
   import Ant from '../../lib/ant/Ant.svelte'
   import { clock } from '../../lib/format'
   import { pop, popOut, rise } from '../../lib/motion'
-  import { antById, app } from '../../lib/store.svelte'
+  import { antById, app, loadOlder } from '../../lib/store.svelte'
   import type { Message, Thread, ToolMessage } from '../../lib/types'
   import RichText from './RichText.svelte'
   import ApprovalCard from './cards/ApprovalCard.svelte'
@@ -69,6 +69,17 @@
   function onScroll() {
     if (!scroller) return
     atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80
+    if (scroller.scrollTop < 200) void older()
+  }
+
+  // Keep the reader's place when history is prepended above them.
+  async function older() {
+    if (!scroller) return
+    const before = scroller.scrollHeight
+    const added = await loadOlder(thread.id)
+    if (!added || !scroller) return
+    await tick()
+    scroller.scrollTop += scroller.scrollHeight - before
   }
 
   function toBottom(smooth = true) {

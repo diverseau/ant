@@ -389,6 +389,28 @@ export async function createAnt(input: { name: string; label?: string; descripti
   return id
 }
 
+const exhausted = new Set<string>()
+let loadingOlder = false
+
+/** Prepend older history when the reader scrolls to the top. Returns how many were added. */
+export async function loadOlder(threadId: string): Promise<number> {
+  const t = threadById(threadId)
+  if (!live() || !t || loadingOlder || exhausted.has(threadId) || !t.messages.length) return 0
+  loadingOlder = true
+  try {
+    const older = await api.older(threadId, t.messages[0].id)
+    if (older.length < 50) exhausted.add(threadId)
+    const known = new Set(t.messages.map((m) => m.id))
+    const fresh = older.filter((m) => !known.has(m.id))
+    t.messages.unshift(...fresh)
+    return fresh.length
+  } catch {
+    return 0
+  } finally {
+    loadingOlder = false
+  }
+}
+
 export async function saveSettings(patch: Partial<Settings>) {
   if (!live()) return
   try {
