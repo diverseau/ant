@@ -11,19 +11,25 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 
 ## Status
 
-Frontend v1 (`web/`) runs on mock data only. There is no backend and no real model calls; `web/src/lib/mock/engine.ts` scripts the replies.
+`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Done: ants, chat, approvals, colonies routing, ant-to-ant, memory, browser computer with take-over, usage. Next: routines, colony/connector/secret/skill UIs, channels (see `docs/plan-backend-v1.md` §17).
 
 ## Commands
 
-All run from `web/`:
+From the repo root (npm workspaces):
 
 - Install: `npm install`
-- Dev: `npm run dev`
-- Type check: `npm run check`
-- Build: `npm run build`
-- Preview build: `npm run preview`
+- antd: `npm run dev:server` (port 7420; ants in `~/Ants`, state in `~/.local/share/ant`)
+- Web: `npm run dev:web` (Vite proxies `/api` and `/ws` to antd)
+- Type check everything: `npm run check`
+- Tests (no model calls; fake `claude`): `npm test`
+- Real end-to-end (spends a little usage, Haiku): `server/e2e/run.sh [chat|browser|all]`
+- Build web: `npm run build`
 
-## Structure (`web/src`)
+## Structure
+
+`server/src`: `service.ts` (ants, turns, events), `broker.ts` (approvals), `tools.ts` (ant MCP tool handlers), `runner/` (claude process + stream parser), `provision/` (ant folders, generated CLAUDE.md/settings), `rules/` (permission engine, floors), `computer/` (Chromium + screencast + lease), `db/` (node:sqlite repos), `api/http.ts`. `packages/ant-mcp`: the MCP server and PreToolUse hook each ant loads. `packages/shared`: types shared by server and web.
+
+### `web/src`
 
 - `styles/tokens.css`: every colour, radius, duration and easing. Change values here, not in components.
 - `lib/store.svelte.ts`: app state (Svelte 5 runes) and all actions. Components call these; they don't mutate deeply on their own.

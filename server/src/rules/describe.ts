@@ -55,6 +55,7 @@ export function describeTool(name: string, input: unknown, folder?: string): Des
     case 'ToolSearch':
       return { title: 'Looked up a tool', connector: 'Tools' }
   }
+  if (name.startsWith('mcp__browser__')) return describeBrowser(name.slice('mcp__browser__browser_'.length), i)
   if (name.startsWith('mcp__')) {
     const [, server = '', ...rest] = name.split('__')
     const action = rest.join('__').replace(/_/g, ' ')
@@ -72,4 +73,41 @@ export function describeTool(name: string, input: unknown, folder?: string): Des
 /** Tools that are plumbing, not worth a row in chat. */
 export function isQuietTool(name: string): boolean {
   return name === 'ToolSearch' || name === 'TodoWrite' || name.startsWith('mcp__ant__')
+}
+
+function host(url: string): string {
+  try {
+    const u = new URL(url)
+    return (u.host + (u.pathname === '/' ? '' : u.pathname)).slice(0, 80)
+  } catch {
+    return url.slice(0, 80)
+  }
+}
+
+function describeBrowser(action: string, i: Record<string, unknown>): Described {
+  const s = (k: string) => (typeof i[k] === 'string' ? (i[k] as string) : '')
+  const target = s('element') || s('ref')
+  const titles: Record<string, string> = {
+    navigate: `Opened ${host(s('url'))}`,
+    navigate_back: 'Went back',
+    click: `Clicked ${target || 'on the page'}`,
+    type: `Typed into ${target || 'a field'}`,
+    fill_form: 'Filled in a form',
+    select_option: `Chose an option in ${target || 'a list'}`,
+    press_key: `Pressed ${s('key')}`,
+    hover: `Hovered ${target}`,
+    snapshot: 'Read the page',
+    take_screenshot: 'Took a screenshot',
+    wait_for: 'Waited for the page',
+    tabs: 'Switched tabs',
+    file_upload: 'Uploaded a file',
+    evaluate: 'Ran a script on the page',
+    close: 'Closed the page',
+    resize: 'Resized the window',
+    console_messages: 'Read the console',
+    network_requests: 'Checked network requests',
+    handle_dialog: 'Answered a dialog',
+    drag: 'Dragged on the page',
+  }
+  return { title: titles[action] ?? `Browser: ${action.replace(/_/g, ' ')}`, detail: s('text') ? clip(s('text'), 120) : undefined, connector: 'Browser' }
 }
