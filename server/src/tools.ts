@@ -63,6 +63,33 @@ export function registerTools(svc: AntService, broker: Broker, scheduler: Schedu
 
   ipc.on('memory', (antId, p) => memory(svc, antId, p))
 
+  // Skills (plan §9): saved through antd because .claude/skills is write-protected for ants.
+  ipc.on('save_skill', async (antId, p) => {
+    const folder = svc.pathsFor(antId).folder
+    const shared = p.shared === true
+    const input = {
+      name: str(p.name).trim(),
+      description: str(p.description).trim(),
+      body: str(p.body),
+      files: Array.isArray(p.files) ? (p.files as P[]).map((f) => ({ path: str(f.path), content: str(f.content) })) : undefined,
+    }
+    if (shared) {
+      const ok = await broker.requestApproval(antId, { action: `Share the skill "${input.name}" with every ant`, detail: input.description, risk: 'medium' })
+      if (!/^Approved/.test(ok)) return `Not shared: ${ok}`
+    }
+    const r = svc.skills.save(folder, input, shared ? 'colony' : 'ant')
+    if (!r.ok) return `Skill not saved:\n- ${r.errors.join('\n- ')}`
+    if (shared) for (const a of R.listAnts(svc.db)) svc.skills.sync(svc.pathsFor(a.id).folder)
+    svc.system(svc.threadForAnt(antId), `${R.getAnt(svc.db, antId)?.name ?? 'An ant'} saved the skill /${input.name}${shared ? ' for the whole colony' : ''}`)
+    svc.emit({ type: 'skills.updated' })
+    return `Saved /${input.name}.${r.warnings.length ? ` Warnings: ${r.warnings.join('; ')}` : ''} It's available from your next session; the user can run it with /${input.name}.`
+  })
+  ipc.on('delete_skill', (antId, p) => {
+    const ok = svc.skills.remove(svc.pathsFor(antId).folder, str(p.name), 'ant')
+    if (ok) svc.emit({ type: 'skills.updated' })
+    return ok ? `Deleted /${str(p.name)}.` : `You have no skill called ${str(p.name)} (colony skills can only be removed by the user).`
+  })
+
   // Routines (plan §8): created by asking the ant in chat.
   const routineErr = (err: unknown) => `Not saved: ${err instanceof Error ? err.message : String(err)}`
   ipc.on('schedule_routine', (antId, p) => {

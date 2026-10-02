@@ -1,4 +1,4 @@
-import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, UsageWindows } from '@ant/shared'
+import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, SkillView, UsageWindows } from '@ant/shared'
 import { api, connectEvents, type RoutinePatch } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
@@ -41,6 +41,8 @@ export const app = $state({
   /** File open in the viewer. */
   viewer: null as { antId: string; path: string; name: string } | null,
   routines: [] as RoutineView[],
+  /** Skills of the selected thread's ant (live mode). */
+  skills: [] as SkillView[],
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 })
 
@@ -149,6 +151,7 @@ export async function init() {
   try {
     await resync()
     app.mode = 'live'
+    refreshSkills()
     connectEvents(
       apply,
       () => {
@@ -238,6 +241,9 @@ function apply(e: AntEvent) {
     case 'computer':
       app.computers[e.state.antId] = e.state
       break
+    case 'skills.updated':
+      refreshSkills()
+      break
     case 'routine.updated':
       upsertRoutine(e.routine)
       break
@@ -295,10 +301,27 @@ export async function routineRuns(id: string) {
   return api.routineRuns(id)
 }
 
+/** The ant whose skills apply to a thread: the ant itself, or a colony's lead. */
+function skillAnt(t: Thread | undefined): string | undefined {
+  if (!t) return undefined
+  return t.kind === 'ant' ? t.refId : colonyById(t.refId)?.memberIds[0]
+}
+
+export function refreshSkills() {
+  const antId = skillAnt(threadById(app.selectedId))
+  if (!live() || !antId) return
+  api
+    .skills(antId)
+    .then((s) => (app.skills = s))
+    .catch(() => {})
+}
+
 export function select(id: string) {
   const t = threadById(id)
   if (!t) return
+  const changedAnt = skillAnt(t) !== skillAnt(threadById(app.selectedId))
   app.selectedId = id
+  if (changedAnt) refreshSkills()
   app.takeover = false
   if (t.unread) {
     t.unread = 0

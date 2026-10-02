@@ -165,6 +165,24 @@ server.registerTool(
 server.registerTool('delete_routine', { description: 'Delete one of your routines by name.', inputSchema: { name: z.string() } }, (args) => call('delete_routine', args))
 
 server.registerTool(
+  'save_skill',
+  {
+    description:
+      'Save a reusable procedure as a skill the user can run with /<name> (and you can use later). Write the body as instructions: when to use it, inputs, steps, how to check the result, what to return, and what needs approval. Set shared to offer it to every ant (asks the user first).',
+    inputSchema: {
+      name: z.string().describe('lowercase-with-dashes, e.g. weekly-digest'),
+      description: z.string().describe('One line: what it does and when to use it'),
+      body: z.string().describe('Markdown instructions (without frontmatter)'),
+      files: z.array(z.object({ path: z.string().describe('under references/, templates/, scripts/ or assets/'), content: z.string() })).optional(),
+      shared: z.boolean().optional(),
+    },
+  },
+  (args) => call('save_skill', args),
+)
+
+server.registerTool('delete_skill', { description: 'Delete one of your own skills by name.', inputSchema: { name: z.string() } }, (args) => call('delete_skill', args))
+
+server.registerTool(
   'share_file',
   { description: 'Show a file from your folder to the user as a file card in chat.', inputSchema: { path: z.string() } },
   (args) => call('share_file', args),

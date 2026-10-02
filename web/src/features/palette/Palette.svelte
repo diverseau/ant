@@ -10,7 +10,7 @@
   import Ant from '../../lib/ant/Ant.svelte'
   import AntStack from '../../lib/ant/AntStack.svelte'
   import { mod } from '../../lib/format'
-  import { skills } from '../../lib/mock/data'
+  import { skills as mockSkills } from '../../lib/mock/data'
   import MessageSquare from '@lucide/svelte/icons/message-square'
   import type { SearchHit } from '@ant/shared'
   import { api } from '../../lib/api'
@@ -39,7 +39,7 @@
     { id: 'computer', group: 'Actions', label: 'Toggle computer panel', icon: Monitor, run: () => togglePanel('computer') },
     { id: 'sidebar', group: 'Actions', label: 'Toggle sidebar', icon: PanelLeft, hint: `${mod} B`, run: () => (app.sidebarCollapsed = !app.sidebarCollapsed) },
     { id: 'connectors', group: 'Actions', label: 'Connectors', icon: Plug, run: () => setTimeout(() => (app.overlay = 'connectors')) },
-    ...skills.map((s) => ({
+    ...(app.mode === 'live' ? app.skills.map((s) => ({ id: s.name, name: s.name, description: s.description })) : mockSkills).map((s) => ({
       id: 'skill-' + s.id,
       group: 'Skills',
       label: '/' + s.name,

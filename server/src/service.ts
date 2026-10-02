@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events'
 import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, UsageWindows } from '@ant/shared'
 import { LoopGuard } from './colony/loop-guard.ts'
 import { ComputerManager } from './computer/manager.ts'
+import { SkillRegistry } from './skills/registry.ts'
 import type { Registry } from './connectors/registry.ts'
 import { antDataDir, type Config } from './config.ts'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -58,6 +59,7 @@ export class AntService {
   private loopGuard = new LoopGuard()
   private activity = new Map<string, string>()
   readonly computers: ComputerManager
+  readonly skills: SkillRegistry
   /** Set by main.ts; connectors and secrets. */
   registry: Registry | null = null
   private reaper: NodeJS.Timeout
@@ -72,6 +74,7 @@ export class AntService {
     this.ipc = ipc
     this.userName = R.getSetting(db, 'user.name', process.env.ANT_USER_NAME ?? 'Leon')
     this.reaper = setInterval(() => this.reapIdle(), 30_000)
+    this.skills = new SkillRegistry(cfg.antHome)
     this.computers = new ComputerManager((state) => this.emit({ type: 'computer', state }), cfg.selfPorts)
     // Anything left "working" from a previous antd run is no longer working.
     for (const a of R.listAnts(db)) if (a.status === 'working') R.updateAnt(db, a.id, { status: 'idle' })
@@ -392,6 +395,7 @@ export class AntService {
     const token = randomBytes(24).toString('hex')
     this.ipc.issueToken(antId, token)
     const paths = this.provision(antId, token)
+    this.skills.sync(paths.folder)
     const known = R.getSetting<string | null>(this.db, `ant.${antId}.session`, null)
     const sessionId = known ?? randomUUID()
     if (!known) R.setSetting(this.db, `ant.${antId}.session`, sessionId)

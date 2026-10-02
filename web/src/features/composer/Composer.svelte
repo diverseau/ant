@@ -10,7 +10,7 @@
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import { tick } from 'svelte'
   import Ant from '../../lib/ant/Ant.svelte'
-  import { connectors, skills } from '../../lib/mock/data'
+  import { connectors, skills as mockSkills } from '../../lib/mock/data'
   import { pop, popOut } from '../../lib/motion'
   import { app, notify, send, stop, threadMembers } from '../../lib/store.svelte'
   import type { Thread } from '../../lib/types'
@@ -80,7 +80,7 @@
     const q = trigger.q
     if (trigger.ch === '/') {
       if (trigger.start !== 0) return []
-      return skills
+      return (app.mode === 'live' ? app.skills.map((s) => ({ id: s.name, name: s.name, description: s.description })) : mockSkills)
         .filter((s) => s.name.includes(q))
         .map((s) => ({ key: s.id, label: `/${s.name}`, sub: s.description, insert: `/${s.name} `, icon: 'skill' as const }))
     }

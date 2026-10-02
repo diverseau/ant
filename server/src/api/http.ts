@@ -370,6 +370,16 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     )
   })
 
+  app.get('/api/ants/:id/skills', (c) => c.json(svc.skills.list(svc.pathsFor(svc.antRow(c.req.param('id')).id).folder)))
+  app.delete('/api/ants/:id/skills/:name', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const scope = c.req.query('scope') === 'colony' ? 'colony' : 'ant'
+    if (!svc.skills.remove(svc.pathsFor(id).folder, c.req.param('name'), scope)) throw new HttpError(404, 'No such skill')
+    if (scope === 'colony') for (const a of R.listAnts(svc.db)) svc.skills.sync(svc.pathsFor(a.id).folder)
+    svc.emit({ type: 'skills.updated' })
+    return c.body(null, 204)
+  })
+
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)

@@ -121,6 +121,13 @@ export interface ConnectorsView {
   secrets: SecretView[]
 }
 
+export interface SkillView {
+  name: string
+  description: string
+  /** An ant's own skill, or one shared with the whole colony. */
+  scope: 'ant' | 'colony'
+}
+
 export interface SearchHit {
   threadId: string
   messageId: string
@@ -159,4 +166,5 @@ export type AntEvent =
   | { type: 'routine.updated'; routine: RoutineView }
   | { type: 'routine.deleted'; routineId: string }
   | { type: 'connectors.updated'; connectors: ConnectorsView }
+  | { type: 'skills.updated' }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string }
