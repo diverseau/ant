@@ -7,7 +7,8 @@ import type { Config } from './config.ts'
 import type { Db } from './db/index.ts'
 import * as R from './db/repos/index.ts'
 import { toAnt, toColony, toMessage, toThread, toThreadSummary } from './mappers.ts'
-import { antPaths, provisionAnt, readIfExists, slugify, type AntPaths } from './provision/ant.ts'
+import { MemoryStore } from './memory/store.ts'
+import { antPaths, provisionAnt, slugify, type AntPaths } from './provision/ant.ts'
 import { describeTool, isQuietTool } from './rules/describe.ts'
 import { AntProcess } from './runner/process.ts'
 import type { StreamEvent } from './runner/stream.ts'
@@ -295,8 +296,7 @@ export class AntService {
         colonies: R.listColonies(this.db)
           .filter((c) => c.memberIds.includes(antId))
           .map((c) => ({ name: c.name, members: c.memberIds.map((m) => R.getAnt(this.db, m)?.name ?? '?') })),
-        memoryBlock: renderEntries(readIfExists(paths0.memory)),
-        userBlock: renderEntries(readIfExists(`${this.cfg.antHome}/USER.md`)),
+        ...memoryBlocks(paths0.memory, `${this.cfg.antHome}/USER.md`),
         grants,
         network: R.getSetting(this.db, `ant.${antId}.network`, 'open') as 'open' | 'allowlist',
         allowedDomains: R.getSetting<string[]>(this.db, `ant.${antId}.domains`, []),
@@ -639,13 +639,11 @@ function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** Render a §-delimited memory file as a bullet list for CLAUDE.md. */
-export function renderEntries(raw: string): string {
-  const entries = raw
-    .split(/\n§\n/)
-    .map((e) => e.trim())
-    .filter(Boolean)
-  return entries.map((e) => `- ${e.replace(/\n/g, '\n  ')}`).join('\n')
+/** Frozen memory snapshot for this session's CLAUDE.md (plan §9). */
+function memoryBlocks(memoryPath: string, userPath: string) {
+  const store = new MemoryStore({ memoryPath, userPath })
+  const bullets = (entries: string[]) => entries.map((e) => `- ${e.replace(/\n/g, '\n  ')}`).join('\n')
+  return { memoryBlock: bullets(store.read('memory')), userBlock: bullets(store.read('user')) }
 }
 
 function limitText(text: string): string | null {

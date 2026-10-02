@@ -114,9 +114,10 @@ server.registerTool(
   'memory',
   {
     description:
-      'Your long-term memory (memory/MEMORY.md), loaded at the start of every session. add a durable fact or preference, replace an entry containing old_text, or remove one. Keep entries short.',
+      'Long-term memory, loaded at the start of every session. target "memory" is your own notes; target "user" is what every ant knows about the user (preferences, facts about them). add a durable fact, replace an entry containing old_text, or remove one. Keep entries short; never store secrets or task progress.',
     inputSchema: {
       op: z.enum(['add', 'replace', 'remove']),
+      target: z.enum(['memory', 'user']).default('memory'),
       text: z.string().optional(),
       old_text: z.string().optional(),
     },

@@ -98,6 +98,25 @@
       </div>
     {/key}
   </section>
+{:else if app.mode === 'connecting'}
+  <section class="chat none"></section>
+{:else if app.threads.length === 0}
+  <section class="chat none">
+    <div class="welcome">
+      <div class="hero-ant"><Ant color="coral" accessory="satchel" mode="full" size={170} follow status="attention" /></div>
+      <h1>Welcome to your colony</h1>
+      <p class="desc">Ants are persistent Claude agents with their own folder, memory and tools. They work while you're away and ask before anything that matters.</p>
+      {#if app.health && (!app.health.claude.found || !app.health.claude.loggedIn || !app.health.sandbox.ok)}
+        <div class="health">
+          {#if !app.health.claude.found}<p>Claude Code isn't installed. Install it, then reload.</p>
+          {:else if !app.health.claude.loggedIn}<p>Claude Code isn't signed in. Run <code>claude</code> in a terminal and use <code>/login</code>.</p>{/if}
+          {#if !app.health.sandbox.ok}<p>The sandbox needs <code>{app.health.sandbox.missing.join(', ')}</code> installed.</p>{/if}
+        </div>
+      {/if}
+      <button class="btn btn-accent hatch" onclick={() => (app.overlay = 'new-ant')}>Hatch your first ant</button>
+      <p class="hint">Their folders live in <code>{app.health?.antHome ?? '~/Ants'}</code></p>
+    </div>
+  </section>
 {:else}
   <section class="chat none">
     <p>Pick an ant, or press <span class="kbd">{mod}</span> <span class="kbd">N</span> to hatch one.</p>
@@ -119,6 +138,51 @@
     place-items: center;
     color: var(--text-muted);
     font-size: var(--text-md);
+  }
+
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    max-width: 520px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .welcome h1 {
+    color: var(--text);
+  }
+
+  .hatch {
+    height: 40px;
+    margin-top: 18px;
+    padding: 0 20px;
+    font-size: var(--text-md);
+    animation: up 600ms 320ms var(--ease-out) both;
+  }
+
+  .hint {
+    margin-top: 6px;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    animation: up 600ms 400ms var(--ease-out) both;
+  }
+
+  .health {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: var(--r-lg);
+    border: 1px solid rgb(242 177 60 / 0.35);
+    background: var(--warn-soft);
+    color: var(--warn);
+    font-size: var(--text-sm);
+    text-align: left;
+  }
+
+  code {
+    font-size: 0.92em;
+    color: var(--text-soft);
   }
 
   header {
