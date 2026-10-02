@@ -9,6 +9,8 @@ import { openDb } from './db/index.ts'
 import { IpcServer } from './ipc.ts'
 import { Scheduler } from './scheduler/runtime.ts'
 import { AntService } from './service.ts'
+import { Registry } from './connectors/registry.ts'
+import { Vault } from './secrets/vault.ts'
 import { registerTools } from './tools.ts'
 
 const cfg = loadConfig()
@@ -18,6 +20,8 @@ mkdirSync(cfg.antHome, { recursive: true })
 const db = openDb(cfg.dbPath)
 const ipc = new IpcServer(cfg.socketPath)
 const svc = new AntService(db, cfg, ipc)
+const vault = new Vault(cfg.dataDir)
+svc.registry = new Registry(db, vault)
 const broker = new Broker(svc)
 const scheduler = new Scheduler(svc)
 svc.routineViews = () => scheduler.list()

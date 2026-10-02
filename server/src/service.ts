@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events'
 import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, UsageWindows } from '@ant/shared'
 import { LoopGuard } from './colony/loop-guard.ts'
 import { ComputerManager } from './computer/manager.ts'
+import type { Registry } from './connectors/registry.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/index.ts'
 import * as R from './db/repos/index.ts'
@@ -54,6 +55,8 @@ export class AntService {
   private loopGuard = new LoopGuard()
   private activity = new Map<string, string>()
   readonly computers: ComputerManager
+  /** Set by main.ts; connectors and secrets. */
+  registry: Registry | null = null
   private reaper: NodeJS.Timeout
   readonly db: Db
   readonly cfg: Config
@@ -309,6 +312,7 @@ export class AntService {
           .map((c) => ({ name: c.name, members: c.memberIds.map((m) => R.getAnt(this.db, m)?.name ?? '?') })),
         ...memoryBlocks(paths0.memory, `${this.cfg.antHome}/USER.md`),
         grants,
+        ...this.toolsFor(antId),
         network: R.getSetting(this.db, `ant.${antId}.network`, 'open') as 'open' | 'allowlist',
         allowedDomains: R.getSetting<string[]>(this.db, `ant.${antId}.domains`, []),
       },
@@ -316,6 +320,16 @@ export class AntService {
       all.filter((a) => a.id !== antId).map((a) => antPaths(this.cfg, { id: a.id, slug: a.slug }).folder),
       this.cdpPort(antId),
     )
+  }
+
+  private toolsFor(antId: string) {
+    const t = this.registry?.forAnt(antId)
+    return { extraMcp: t?.mcpServers ?? {}, extraDeny: t?.deny ?? [], toolsBlock: t?.toolsBlock ?? '' }
+  }
+
+  /** Restart idle ants so config changes (connectors, secrets) apply on their next turn. */
+  refreshIdle() {
+    for (const [antId, l] of this.live) if (!l.current) this.stopAnt(antId)
   }
 
   /** A stable CDP port per ant, so its MCP config can name it before Chromium starts. */
@@ -366,7 +380,7 @@ export class AntService {
         mcpConfigPath: paths.mcpConfig,
         model: row.model || this.cfg.defaultModel,
         effort: row.effort || undefined,
-        env: { ANT_SOCKET: this.cfg.socketPath, ANT_TOKEN: token, ANT_ID: antId },
+        env: { ...(this.registry?.forAnt(antId).env ?? {}), ANT_SOCKET: this.cfg.socketPath, ANT_TOKEN: token, ANT_ID: antId },
       },
       {
         onEvent: (e) => this.onEvent(antId, e),
@@ -411,6 +425,7 @@ export class AntService {
     const threadId = l.current?.threadId ?? this.antThread(antId).id
     switch (e.t) {
       case 'init':
+        if (this.registry?.noteDiscovered(e.mcpServers)) this.emitConnectors()
         if (e.sessionId && e.sessionId !== l.sessionId) {
           l.sessionId = e.sessionId
           R.setSetting(this.db, `ant.${antId}.session`, e.sessionId)
@@ -541,6 +556,11 @@ export class AntService {
       this.finishTurn(antId, l, false)
       this.insert(turn.threadId, antId, 'error', { detail }, limitText(detail) ?? 'This ant stopped unexpectedly. Send another message to restart it.')
     }
+  }
+
+  emitConnectors() {
+    if (!this.registry) return
+    this.emit({ type: 'connectors.updated', connectors: { claudeAi: this.registry.claudeAi(), custom: this.registry.custom(), secrets: this.registry.secrets() } })
   }
 
   setStatus(antId: string, status: Ant['status']) {

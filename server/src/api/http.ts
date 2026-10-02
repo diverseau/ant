@@ -160,6 +160,68 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     }),
   )
 
+  // Connectors and secrets (plan §11). Secret values go in, never out.
+  const reg = () => svc.registry!
+  const connectorsView = () => ({ claudeAi: reg().claudeAi(), custom: reg().custom(), secrets: reg().secrets() })
+  const changed = () => {
+    svc.emitConnectors()
+    svc.refreshIdle()
+  }
+  app.get('/api/connectors', (c) => c.json(connectorsView()))
+  app.patch('/api/connectors/claudeai', async (c) => {
+    const b = await body(c, z.object({ key: z.string(), disabledFor: z.array(z.string()) }))
+    reg().setClaudeAiDisabled(b.key, b.disabledFor)
+    changed()
+    return c.json(connectorsView())
+  })
+  app.post('/api/connectors', async (c) => {
+    const b = await body(
+      c,
+      z.object({
+        name: z.string().min(1).max(40),
+        transport: z.enum(['http', 'stdio']),
+        url: z.string().url().optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        command: z.string().optional(),
+        args: z.array(z.string()).optional(),
+        env: z.record(z.string(), z.string()).optional(),
+        allAnts: z.boolean().optional(),
+        antIds: z.array(z.string()).optional(),
+      }),
+    )
+    reg().addCustom(b)
+    changed()
+    return c.json(connectorsView(), 201)
+  })
+  app.patch('/api/connectors/:id', async (c) => {
+    const b = await body(c, z.object({ allAnts: z.boolean(), antIds: z.array(z.string()) }))
+    reg().scopeCustom(c.req.param('id'), b.allAnts, b.antIds)
+    changed()
+    return c.json(connectorsView())
+  })
+  app.delete('/api/connectors/:id', (c) => {
+    reg().removeCustom(c.req.param('id'))
+    changed()
+    return c.json(connectorsView())
+  })
+  app.post('/api/secrets', async (c) => {
+    const b = await body(c, z.object({ name: z.string(), description: z.string().max(300).default(''), value: z.string().min(1).max(20_000), allAnts: z.boolean().optional(), antIds: z.array(z.string()).optional() }))
+    reg().addSecret(b)
+    changed()
+    return c.json(connectorsView(), 201)
+  })
+  app.patch('/api/secrets/:id', async (c) => {
+    const b = await body(c, z.object({ description: z.string().max(300).optional(), value: z.string().max(20_000).optional(), allAnts: z.boolean().optional(), antIds: z.array(z.string()).optional() }))
+    reg().updateSecret(c.req.param('id'), b)
+    changed()
+    return c.json(connectorsView())
+  })
+  app.delete('/api/secrets/:id', (c) => {
+    reg().removeSecret(c.req.param('id'))
+    changed()
+    return c.json(connectorsView())
+  })
+
   // Routines
   app.get('/api/routines', (c) => c.json(scheduler.list(c.req.query('antId'))))
   app.post('/api/routines', async (c) => {

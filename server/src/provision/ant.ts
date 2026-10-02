@@ -27,6 +27,12 @@ export interface ProvisionContext {
   grants: string[]
   network: 'open' | 'allowlist'
   allowedDomains: string[]
+  /** Custom MCP connectors scoped to this ant. */
+  extraMcp: Record<string, unknown>
+  /** Tool deny rules, e.g. claude.ai connectors switched off for this ant. */
+  extraDeny: string[]
+  /** Connectors and secrets the ant can use, for CLAUDE.md. */
+  toolsBlock: string
 }
 
 const ANT_MCP_MAIN = fileURLToPath(new URL('../../../packages/ant-mcp/src/main.ts', import.meta.url))
@@ -102,7 +108,7 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
         'Skill',
         ...ctx.grants,
       ],
-      deny: [...denies.map((d) => `Read(${d})`), ...denies.map((d) => `Edit(${d})`)],
+      deny: [...denies.map((d) => `Read(${d})`), ...denies.map((d) => `Edit(${d})`), ...ctx.extraDeny],
     },
     sandbox: {
       enabled: true,
@@ -118,9 +124,10 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
   }
 }
 
-export function mcpConfigFor(cfg: Config, token: string, paths: AntPaths, cdpPort: number) {
+export function mcpConfigFor(cfg: Config, token: string, paths: AntPaths, cdpPort: number, extra: Record<string, unknown> = {}) {
   return {
     mcpServers: {
+      ...extra,
       ant: { command: 'node', args: [ANT_MCP_MAIN], env: { ANT_SOCKET: cfg.socketPath, ANT_TOKEN: token } },
       // The ant's own Chromium, started on demand by antd (PreToolUse hook) and shared with
       // the user's take-over view.
@@ -172,7 +179,7 @@ Use the \`memory\` tool to keep durable facts and preferences (not task progress
 
 ${ctx.memoryBlock || '_Nothing yet._'}
 
-${ctx.userBlock ? `## About ${ctx.userName}\n${ctx.userBlock}\n` : ''}`
+${ctx.toolsBlock ? `## Tools you have\n${ctx.toolsBlock}\n\n` : ''}${ctx.userBlock ? `## About ${ctx.userName}\n${ctx.userBlock}\n` : ''}`
 }
 
 function firstLine(s: string): string {
@@ -189,7 +196,7 @@ export function provisionAnt(cfg: Config, ant: Ant & { slug: string }, ctx: Prov
   if (!existsSync(paths.memory)) writeFileSync(paths.memory, '')
   writeFileSync(paths.claudeMd, claudeMdFor(ant, paths, ctx))
   writeFileSync(paths.settings, JSON.stringify(settingsFor(cfg, paths, ctx, otherFolders), null, 2), { mode: 0o600 })
-  writeFileSync(paths.mcpConfig, JSON.stringify(mcpConfigFor(cfg, token, paths, cdpPort), null, 2), { mode: 0o600 })
+  writeFileSync(paths.mcpConfig, JSON.stringify(mcpConfigFor(cfg, token, paths, cdpPort, ctx.extraMcp), null, 2), { mode: 0o600 })
   return paths
 }
 

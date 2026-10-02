@@ -73,6 +73,44 @@ export interface CreateRoutineInput {
   trigger?: 'schedule' | 'webhook'
 }
 
+export interface ClaudeAiConnector {
+  /** Display name, e.g. "Gmail". */
+  name: string
+  /** Server name the CLI reports, e.g. "claude.ai Gmail". */
+  key: string
+  status: 'connected' | 'needs-auth' | 'error'
+  /** Ants this connector is switched off for. */
+  disabledFor: string[]
+}
+
+export interface CustomConnector {
+  id: string
+  name: string
+  transport: 'http' | 'stdio'
+  url?: string
+  command?: string
+  args?: string[]
+  allAnts: boolean
+  antIds: string[]
+  status: string
+}
+
+export interface SecretView {
+  id: string
+  /** Environment variable name, e.g. GITHUB_TOKEN. Values are never sent to the web app. */
+  name: string
+  description: string
+  allAnts: boolean
+  antIds: string[]
+  updatedAt: number
+}
+
+export interface ConnectorsView {
+  claudeAi: ClaudeAiConnector[]
+  custom: CustomConnector[]
+  secrets: SecretView[]
+}
+
 export interface CreateAntInput {
   name: string
   label?: string
@@ -101,4 +139,5 @@ export type AntEvent =
   | { type: 'computer'; state: ComputerState }
   | { type: 'routine.updated'; routine: RoutineView }
   | { type: 'routine.deleted'; routineId: string }
+  | { type: 'connectors.updated'; connectors: ConnectorsView }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; text: string }
