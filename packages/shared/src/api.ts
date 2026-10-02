@@ -117,6 +117,15 @@ export interface SecretView {
   updatedAt: number
 }
 
+export interface ChannelStatus {
+  kind: 'telegram' | 'discord' | 'slack'
+  enabled: boolean
+  connected: boolean
+  botName: string | null
+  error: string | null
+  allowUsers: string[]
+}
+
 export interface ConnectorsView {
   claudeAi: ClaudeAiConnector[]
   custom: CustomConnector[]

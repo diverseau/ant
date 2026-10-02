@@ -1,4 +1,5 @@
 // Client for antd: REST calls and the live event stream.
+import type { ChannelStatus, ConnectorsView } from '@ant/shared'
 import type { AntEvent, ApprovalDecision, Bootstrap, Colony, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
 export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled'>>
@@ -42,6 +43,17 @@ export const api = {
   older: (threadId: string, before: string) => req<Message[]>('GET', `/api/threads/${threadId}/messages?before=${encodeURIComponent(before)}`),
   rules: (antId: string) => req<RuleView[]>('GET', `/api/ants/${antId}/rules`),
   deleteRule: (id: string) => req('DELETE', `/api/rules/${id}`),
+  connectors: () => req<ConnectorsView>('GET', '/api/connectors'),
+  setClaudeAi: (key: string, disabledFor: string[]) => req<ConnectorsView>('PATCH', '/api/connectors/claudeai', { key, disabledFor }),
+  addConnector: (input: Record<string, unknown>) => req<ConnectorsView>('POST', '/api/connectors', input),
+  scopeConnector: (id: string, allAnts: boolean, antIds: string[]) => req<ConnectorsView>('PATCH', `/api/connectors/${id}`, { allAnts, antIds }),
+  deleteConnector: (id: string) => req<ConnectorsView>('DELETE', `/api/connectors/${id}`),
+  addSecret: (input: { name: string; description: string; value: string; allAnts?: boolean; antIds?: string[] }) => req<ConnectorsView>('POST', '/api/secrets', input),
+  updateSecret: (id: string, patch: { description?: string; value?: string; allAnts?: boolean; antIds?: string[] }) => req<ConnectorsView>('PATCH', `/api/secrets/${id}`, patch),
+  deleteSecret: (id: string) => req<ConnectorsView>('DELETE', `/api/secrets/${id}`),
+  channels: () => req<ChannelStatus[]>('GET', '/api/channels'),
+  setChannel: (kind: string, cfg: { enabled: boolean; tokenSecret: string; allowUsers: string[] }) => req<ChannelStatus[]>('PUT', `/api/channels/${kind}`, cfg),
+  deleteChannel: (kind: string) => req<ChannelStatus[]>('DELETE', `/api/channels/${kind}`),
   skills: (antId: string) => req<SkillView[]>('GET', `/api/ants/${antId}/skills`),
   search: (q: string) => req<SearchHit[]>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   settings: (patch: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', patch),

@@ -6,6 +6,7 @@
   import { pop } from '../../lib/motion'
   import { app } from '../../lib/store.svelte'
   import Modal from '../../lib/ui/Modal.svelte'
+  import LiveConnectors from './LiveConnectors.svelte'
 
   let list = $state(seed)
   let tab: 'all' | 'installed' = $state('all')
@@ -23,7 +24,10 @@
   }
 </script>
 
-<Modal onclose={() => (app.overlay = null)} width={680} label="Connectors">
+<Modal onclose={() => (app.overlay = null)} width={720} label="Connectors">
+  {#if app.mode === 'live'}
+    <LiveConnectors />
+  {:else}
   <div class="head">
     <h2>Connectors</h2>
     <div class="tabs" role="tablist">
@@ -48,6 +52,7 @@
       </div>
     {/each}
   </div>
+  {/if}
 </Modal>
 
 <style>

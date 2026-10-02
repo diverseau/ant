@@ -1,4 +1,4 @@
-import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, SkillView, UsageWindows } from '@ant/shared'
+import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, SkillView, UsageWindows, ChannelStatus, ConnectorsView } from '@ant/shared'
 import { api, connectEvents, type ColonyPatch, type RoutinePatch } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
@@ -41,6 +41,8 @@ export const app = $state({
   /** File open in the viewer. */
   viewer: null as { antId: string; path: string; name: string } | null,
   routines: [] as RoutineView[],
+  connectors: null as ConnectorsView | null,
+  channels: [] as ChannelStatus[],
   /** Skills of the selected thread's ant (live mode). */
   skills: [] as SkillView[],
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -249,6 +251,9 @@ function apply(e: AntEvent) {
     case 'skills.updated':
       refreshSkills()
       break
+    case 'connectors.updated':
+      app.connectors = e.connectors
+      break
     case 'routine.updated':
       upsertRoutine(e.routine)
       break
@@ -311,6 +316,29 @@ function skillAnt(t: Thread | undefined): string | undefined {
   if (!t) return undefined
   const colony = t.kind === 'colony' ? colonyById(t.refId) : undefined
   return t.kind === 'ant' ? t.refId : colony?.leadAntId ?? colony?.memberIds[0]
+}
+
+export async function loadConnectors() {
+  if (!live()) return
+  try {
+    const [c, ch] = await Promise.all([api.connectors(), api.channels()])
+    app.connectors = c
+    app.channels = ch
+  } catch (err) {
+    fail(err)
+  }
+}
+
+/** Run a connectors/secrets/channels mutation; the server answers with the fresh view. */
+export async function connectorsDo<T>(fn: () => Promise<T>, apply: (r: T) => void, ok?: string): Promise<boolean> {
+  try {
+    apply(await fn())
+    if (ok) notify(ok)
+    return true
+  } catch (err) {
+    fail(err)
+    return false
+  }
 }
 
 export function refreshSkills() {
