@@ -1,6 +1,7 @@
 // Permission broker (plan §4): turns Claude Code permission prompts and ants' own
 // request_approval calls into approval cards, and waits for the user.
 import { execFile } from 'node:child_process'
+import { dirname } from 'node:path'
 import type { ApprovalDecision } from '@ant/shared'
 import * as R from './db/repos/index.ts'
 import { describeTool } from './rules/describe.ts'
@@ -148,8 +149,8 @@ export class Broker {
     const a = R.getApproval(this.svc.db, approvalId)
     if (!a) throw new HttpError(404, 'No such approval')
     if (a.status !== 'pending') throw new HttpError(409, 'Already decided')
-    if (decision === 'always' && a.toolName !== 'request_approval') {
-      R.addRule(this.svc.db, { scope: 'ant', antId: a.antId, pattern: a.toolName, behaviour: 'allow', source: 'user', note: `Always allowed from chat` })
+    if (decision === 'always' && !['request_approval', 'request_handoff'].includes(a.toolName)) {
+      R.addRule(this.svc.db, { scope: 'ant', antId: a.antId, pattern: a.toolName, behaviour: 'allow', source: 'user', note: scopeNote(a.toolName, a.input) })
     }
     this.finalise(approvalId, decision)
   }
@@ -194,6 +195,21 @@ export class Broker {
   shutdown() {
     clearInterval(this.sweeper)
   }
+}
+
+/**
+ * "Always allow" must not widen into "allow everything this tool can do": file writes are
+ * scoped to the directory, shell commands to the exact command. Connector actions stay per
+ * action (e.g. Gmail send), which is what the user means by "always".
+ */
+function scopeNote(tool: string, input: unknown): string {
+  const i = (input ?? {}) as Record<string, unknown>
+  if (['Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
+    const p = String(i.file_path ?? i.notebook_path ?? '')
+    if (p) return `input:${JSON.stringify(dirname(p) + '/').slice(1, -1)}`
+  }
+  if (tool === 'Bash' && typeof i.command === 'string') return `input:${JSON.stringify(i.command).slice(1, -1)}`
+  return 'Always allowed from chat'
 }
 
 function normalise(text: string): string {
