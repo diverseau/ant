@@ -38,6 +38,10 @@ export class Broker {
   async permission(antId: string, p: { tool_name?: string; input?: unknown }) {
     const tool = String(p.tool_name ?? '')
     const input = p.input ?? {}
+    // Ant's own API/UI is off-limits: reaching it would let an ant approve itself.
+    if (targetsSelf(JSON.stringify(input), this.svc.cfg.selfPorts)) {
+      return { behavior: 'deny', message: "That address is Ant's own control panel, which ants can't access. Don't retry." }
+    }
     const folder = this.svc.pathsFor(antId).folder
     const verdict = decide(tool, input, { folder, rules: this.rulesFor(antId) })
 
@@ -188,6 +192,10 @@ export class Broker {
   shutdown() {
     clearInterval(this.sweeper)
   }
+}
+
+export function targetsSelf(text: string, ports: number[]): boolean {
+  return ports.some((p) => new RegExp(`(localhost|127\\.\\d+\\.\\d+\\.\\d+|0\\.0\\.0\\.0|\\[::1\\]|::1)[:/]+${p}\\b`).test(text))
 }
 
 function desktopNotify(title: string, body: string) {

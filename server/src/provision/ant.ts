@@ -33,6 +33,8 @@ export interface ProvisionContext {
   extraDeny: string[]
   /** Connectors and secrets the ant can use, for CLAUDE.md. */
   toolsBlock: string
+  /** Every ant's Chromium debugging port: shell access would hand over that browser and its logins. */
+  cdpPorts: number[]
 }
 
 const ANT_MCP_MAIN = fileURLToPath(new URL('../../../packages/ant-mcp/src/main.ts', import.meta.url))
@@ -117,7 +119,11 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
       // container is the outer boundary (Claude Code sandboxing docs, "Linux sandbox strength").
       ...(process.env.ANT_IN_CONTAINER === '1' && { enableWeakerNestedSandbox: true }),
       filesystem: { denyRead: denies.map((d) => d.replace(/^\/\//, '/').replace(/\/\*\*$/, '')) },
-      network: ctx.network === 'allowlist' ? { allowedDomains: ctx.allowedDomains, strictAllowlist: true } : {},
+      network: {
+        ...(ctx.network === 'allowlist' && { allowedDomains: ctx.allowedDomains, strictAllowlist: true }),
+        // Shell commands must not reach antd's API (an ant could approve itself).
+        deniedDomains: selfHosts([...cfg.selfPorts, ...ctx.cdpPorts]),
+      },
     },
     autoMemoryEnabled: false,
     includeCoAuthoredBy: false,
@@ -125,6 +131,11 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
       PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: `node ${ANT_HOOK}`, timeout: 30 }] }],
     },
   }
+}
+
+/** host:port entries for every loopback spelling of Ant's own ports. */
+export function selfHosts(ports: number[]): string[] {
+  return ports.flatMap((p) => ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '*.localhost'].map((h) => `${h}:${p}`))
 }
 
 export function mcpConfigFor(cfg: Config, token: string, paths: AntPaths, cdpPort: number, extra: Record<string, unknown> = {}) {

@@ -1,4 +1,4 @@
-export const base = `http://127.0.0.1:${process.env.ANT_PORT ?? 7421}`
+export const base = `http://127.0.0.1:${process.env.ANT_PORT ?? 7431}`
 export const events = []
 export async function connect() {
   const ws = new WebSocket(base.replace('http', 'ws') + '/ws')

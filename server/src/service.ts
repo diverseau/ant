@@ -72,7 +72,7 @@ export class AntService {
     this.ipc = ipc
     this.userName = R.getSetting(db, 'user.name', process.env.ANT_USER_NAME ?? 'Leon')
     this.reaper = setInterval(() => this.reapIdle(), 30_000)
-    this.computers = new ComputerManager((state) => this.emit({ type: 'computer', state }))
+    this.computers = new ComputerManager((state) => this.emit({ type: 'computer', state }), cfg.selfPorts)
     // Anything left "working" from a previous antd run is no longer working.
     for (const a of R.listAnts(db)) if (a.status === 'working') R.updateAnt(db, a.id, { status: 'idle' })
   }
@@ -350,6 +350,7 @@ export class AntService {
         ...memoryBlocks(paths0.memory, `${this.cfg.antHome}/USER.md`),
         grants,
         ...this.toolsFor(antId),
+        cdpPorts: all.map((a) => this.cdpPort(a.id)),
         network: R.getSetting(this.db, `ant.${antId}.network`, 'open') as 'open' | 'allowlist',
         allowedDomains: R.getSetting<string[]>(this.db, `ant.${antId}.domains`, []),
       },

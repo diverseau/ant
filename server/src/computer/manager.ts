@@ -10,16 +10,18 @@ export class ComputerManager {
   private leases = new Map<string, 'ant' | 'user'>()
   private onState: (s: ComputerState) => void
   private sweeper: NodeJS.Timeout
+  private blockedPorts: number[]
 
-  constructor(onState: (s: ComputerState) => void) {
+  constructor(onState: (s: ComputerState) => void, blockedPorts: number[] = []) {
     this.onState = onState
+    this.blockedPorts = blockedPorts
     this.sweeper = setInterval(() => this.stopIdle(), 60_000)
   }
 
   private get(antId: string, folder: string, port: number): AntBrowser {
     let b = this.browsers.get(antId)
     if (!b) {
-      b = new AntBrowser(join(folder, 'browser'), port)
+      b = new AntBrowser(join(folder, 'browser'), port, this.blockedPorts)
       this.browsers.set(antId, b)
     }
     return b

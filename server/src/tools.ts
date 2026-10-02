@@ -141,7 +141,9 @@ export const floors = {
       const input = (p.tool_input ?? {}) as P
       const v = evaluateFloors(str(input.command), { cwd: svc.pathsFor(antId).folder, home: process.env.HOME })
       if (v.action === 'block') return { action: 'block', message: `Blocked by Ant: ${v.message}` }
-      if (v.action === 'ask') return { action: 'ask', message: v.matches.map((m) => m.title).join(', ') }
+      // Medium findings are file writes outside the folder, which the OS sandbox already blocks.
+      const serious = v.action === 'ask' ? v.matches.filter((m) => m.severity !== 'medium') : []
+      if (serious.length) return { action: 'ask', message: serious.map((m) => m.title).join(', ') }
     }
     return { action: 'pass' }
   },

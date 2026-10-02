@@ -33,11 +33,14 @@ export class AntBrowser {
   private size = { width: 1280, height: 800 }
   private starting: Promise<void> | null = null
   readonly port: number
+  /** Ant's own ports: every request to them is failed, from any tab or client. */
+  private blockedPorts: number[]
   lastActive = Date.now()
 
-  constructor(profileDir: string, port: number) {
+  constructor(profileDir: string, port: number, blockedPorts: number[] = []) {
     this.profileDir = profileDir
     this.port = port
+    this.blockedPorts = blockedPorts
   }
 
   get running() {
@@ -88,11 +91,28 @@ export class AntBrowser {
     if (!up) throw new Error('Chromium did not start')
     const version = (await (await fetch(`${this.cdpEndpoint}/json/version`)).json()) as { webSocketDebuggerUrl: string }
     await this.connect(version.webSocketDebuggerUrl)
+    await this.blockSelf()
     await this.send('Target.setDiscoverTargets', { discover: true })
     const { targetInfos } = await this.send('Target.getTargets')
     for (const t of targetInfos) if (t.type === 'page') this.pages.set(t.targetId, { url: t.url, title: t.title, touched: Date.now() })
     await this.follow()
   }
+
+  /**
+   * The ant's browser runs outside the sandbox, so it could open the Ant UI or API and approve
+   * its own requests. Browser-level Fetch interception covers every target and every CDP client
+   * (incl. playwright-mcp); per-page Network.setBlockedURLs does not.
+   */
+  private async blockSelf() {
+    if (!this.blockedPorts.length) return
+    const { sessionId } = await this.send('Target.attachToBrowserTarget')
+    this.browserSession = sessionId
+    const hosts = ['127.0.0.1', 'localhost', '0.0.0.0', '[::1]', '*.localhost']
+    const patterns = this.blockedPorts.flatMap((p) => hosts.map((h) => ({ urlPattern: `*://${h}:${p}/*` })))
+    await this.send('Fetch.enable', { patterns }, sessionId)
+  }
+
+  private browserSession: string | null = null
 
   private connect(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -124,6 +144,9 @@ export class AntBrowser {
       return
     }
     switch (m.method) {
+      case 'Fetch.requestPaused':
+        void this.send('Fetch.failRequest', { requestId: m.params.requestId, errorReason: 'BlockedByClient' }, m.sessionId).catch(() => {})
+        break
       case 'Target.targetCreated':
       case 'Target.targetInfoChanged': {
         const t = m.params.targetInfo

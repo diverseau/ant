@@ -20,6 +20,8 @@ export interface Config {
   idleMs: number
   defaultModel: string
   version: string
+  /** Ports serving Ant itself (antd + web dev servers). Ants must never reach these. */
+  selfPorts: number[]
 }
 
 export function loadConfig(env = process.env): Config {
@@ -36,6 +38,7 @@ export function loadConfig(env = process.env): Config {
     idleMs: Number(env.ANT_IDLE_MS ?? 10 * 60_000),
     defaultModel: env.ANT_MODEL ?? 'sonnet',
     version: '0.2.0',
+    selfPorts: [...new Set([Number(env.ANT_PORT ?? 7420), ...(env.ANT_WEB_PORTS ?? '5173,5180,5181').split(',').map(Number)])].filter((n) => n > 0),
   }
 }
 
