@@ -10,12 +10,15 @@
   import { clock } from '../../lib/format'
   import { pop, popOut, rise } from '../../lib/motion'
   import { antById, app } from '../../lib/store.svelte'
-  import type { Message, Thread } from '../../lib/types'
+  import type { Message, Thread, ToolMessage } from '../../lib/types'
   import RichText from './RichText.svelte'
   import ApprovalCard from './cards/ApprovalCard.svelte'
   import ChecklistCard from './cards/ChecklistCard.svelte'
   import ComputerCard from './cards/ComputerCard.svelte'
   import DraftCard from './cards/DraftCard.svelte'
+  import ToolGroup from './cards/ToolGroup.svelte'
+  import FileCard from './cards/FileCard.svelte'
+  import ErrorCard from './cards/ErrorCard.svelte'
 
   let { thread }: { thread: Thread } = $props()
 
@@ -23,6 +26,21 @@
   const GAP = 5 * 60_000
   const same = (a?: Message, b?: Message) =>
     !!a && !!b && a.author === b.author && a.author !== 'system' && a.kind !== 'system' && b.kind !== 'system' && Math.abs(b.at - a.at) < GAP
+
+  // Keep the first tool's key while its consecutive run grows.
+  const rows = $derived.by(() => {
+    const grouped: { m: Message; tools: ToolMessage[]; end: Message }[] = []
+    for (const m of thread.messages) {
+      const prev = grouped.at(-1)
+      if (m.kind === 'tool' && prev?.m.kind === 'tool' && prev.m.author === m.author) {
+        prev.tools.push(m)
+        prev.end = m
+      } else {
+        grouped.push({ m, tools: m.kind === 'tool' ? [m] : [], end: m })
+      }
+    }
+    return grouped
+  })
 
   const typingId = $derived(app.typing[thread.id])
   const last = $derived(thread.messages.at(-1))
@@ -64,14 +82,15 @@
 
 <div class="scroller" bind:this={scroller} onscroll={onScroll}>
   <div class="column">
-    {#each thread.messages as m, i (m.id)}
-      {@const prev = thread.messages[i - 1]}
-      {@const next = thread.messages[i + 1]}
+    {#each rows as row, i (row.m.id)}
+      {@const m = row.m}
+      {@const prev = rows[i - 1]?.end}
+      {@const next = rows[i + 1]?.m}
       {@const ant = m.author !== 'user' && m.author !== 'system' ? antById(m.author) : undefined}
       {@const first = !same(prev, m)}
-      {@const lastInGroup = !same(m, next)}
+      {@const lastInGroup = !same(row.end, next)}
 
-      <div class="msg" class:first class:user={m.author === 'user'} class:colony in:rise>
+      <div class="msg" class:first class:user={m.author === 'user' && m.kind !== 'tool'} class:colony in:rise>
         {#if m.kind === 'system'}
           <div class="system">{m.text}</div>
         {:else if m.kind === 'routine'}
@@ -124,6 +143,12 @@
                 <ApprovalCard {m} threadId={thread.id} />
               {:else if m.kind === 'draft'}
                 <DraftCard {m} threadId={thread.id} />
+              {:else if m.kind === 'tool'}
+                <ToolGroup messages={row.tools} />
+              {:else if m.kind === 'file'}
+                <FileCard {m} />
+              {:else if m.kind === 'error'}
+                <ErrorCard {m} />
               {/if}
             </div>
           </div>

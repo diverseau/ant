@@ -31,7 +31,7 @@
   .stack {
     position: fixed;
     right: 16px;
-    bottom: 16px;
+    top: 62px;
     z-index: 70;
     display: flex;
     flex-direction: column;
@@ -53,7 +53,7 @@
     box-shadow: var(--shadow-lg);
     font-size: var(--text-sm);
     color: var(--text-soft);
-    transform-origin: bottom right;
+    transform-origin: top right;
   }
 
   .toast span {
