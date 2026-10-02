@@ -47,6 +47,22 @@
   const showTyping = $derived(!!typingId && !(last?.kind === 'text' && last.streaming))
 
   let scroller: HTMLDivElement | undefined = $state()
+  let focused: string | null = $state(null)
+
+  // Jump to a message picked from search, then let the highlight fade.
+  $effect(() => {
+    const id = app.focusMessage
+    if (!id || !scroller) return
+    tick().then(() => {
+      const el = scroller?.querySelector<HTMLElement>(`[data-mid="${id}"]`)
+      if (!el) return
+      atBottom = false
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      focused = id
+      app.focusMessage = null
+      setTimeout(() => (focused = null), 2200)
+    })
+  })
   let atBottom = $state(true)
   let copied: string | null = $state(null)
 
@@ -90,7 +106,7 @@
       {@const first = !same(prev, m)}
       {@const lastInGroup = !same(row.end, next)}
 
-      <div class="msg" class:first class:user={m.author === 'user' && m.kind !== 'tool'} class:colony in:rise>
+      <div class="msg" class:first class:user={m.author === 'user' && m.kind !== 'tool'} class:colony class:focused={focused === m.id} data-mid={m.id} in:rise>
         {#if m.kind === 'system'}
           <div class="system">{m.text}</div>
         {:else if m.kind === 'routine'}
@@ -195,6 +211,16 @@
 
   .msg {
     margin-top: 4px;
+  }
+
+  .msg {
+    border-radius: var(--r-xl);
+    transition: background 600ms var(--ease-out), box-shadow 600ms var(--ease-out);
+  }
+
+  .msg.focused {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 8px var(--accent-soft);
   }
 
   .msg.first {

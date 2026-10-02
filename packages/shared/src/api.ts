@@ -121,6 +121,15 @@ export interface ConnectorsView {
   secrets: SecretView[]
 }
 
+export interface SearchHit {
+  threadId: string
+  messageId: string
+  author: string
+  at: number
+  /** Text around the match; matched terms are wrapped in \u0001…\u0002 markers, never HTML. */
+  snippet: string
+}
+
 export interface CreateAntInput {
   name: string
   label?: string

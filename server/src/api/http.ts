@@ -332,6 +332,20 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.body(readFileSync(file), 200, { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=31536000, immutable' })
   })
 
+  app.get('/api/search', (c) => {
+    const q = (c.req.query('q') ?? '').slice(0, 200)
+    if (q.trim().length < 2) return c.json([])
+    return c.json(
+      R.searchMessages(svc.db, q, { limit: 20 }).map((r) => ({
+        threadId: r.message.threadId,
+        messageId: r.message.id,
+        author: r.message.author,
+        at: r.message.createdAt,
+        snippet: r.snippet.replace(/<mark>/g, '\u0001').replace(/<\/mark>/g, '\u0002'),
+      })),
+    )
+  })
+
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)

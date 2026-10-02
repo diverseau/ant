@@ -36,6 +36,8 @@ export const app = $state({
   notices: [] as Notice[],
   computers: {} as Record<string, ComputerState>,
   settings: null as Settings | null,
+  /** Message to scroll to and highlight (from search). */
+  focusMessage: null as string | null,
   /** File open in the viewer. */
   viewer: null as { antId: string; path: string; name: string } | null,
 })

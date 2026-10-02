@@ -11,7 +11,10 @@
   import AntStack from '../../lib/ant/AntStack.svelte'
   import { mod } from '../../lib/format'
   import { skills } from '../../lib/mock/data'
-  import { app, preview, select, sortedThreads, threadMembers, threadTitle, togglePanel } from '../../lib/store.svelte'
+  import MessageSquare from '@lucide/svelte/icons/message-square'
+  import type { SearchHit } from '@ant/shared'
+  import { api } from '../../lib/api'
+  import { antById, app, preview, select, sortedThreads, threadById, threadMembers, threadTitle, togglePanel } from '../../lib/store.svelte'
   import type { Thread } from '../../lib/types'
   import Modal from '../../lib/ui/Modal.svelte'
 
@@ -59,13 +62,44 @@
     return (i.sub ?? '').toLowerCase().includes(s) ? 0.5 : 0
   }
 
-  const results = $derived(
-    all
+  // Full-text search over every conversation (live mode only), debounced.
+  let hits: SearchHit[] = $state([])
+  $effect(() => {
+    const term = q.trim()
+    if (app.mode !== 'live' || term.length < 2) {
+      hits = []
+      return
+    }
+    const t = setTimeout(() => api.search(term).then((h) => (hits = h)).catch(() => (hits = [])), 160)
+    return () => clearTimeout(t)
+  })
+
+  const hitItems = $derived<Item[]>(
+    hits.map((h) => {
+      const t = threadById(h.threadId)
+      const who = h.author === 'user' ? 'You' : h.author === 'system' ? '' : (antById(h.author)?.name ?? '')
+      return {
+        id: 'hit-' + h.messageId,
+        group: 'Messages',
+        label: (t ? threadTitle(t) : 'Chat') + (who ? ` · ${who}` : ''),
+        sub: h.snippet.replace(/[\u0001\u0002]/g, ''),
+        icon: MessageSquare,
+        run: () => {
+          select(h.threadId)
+          app.focusMessage = h.messageId
+        },
+      }
+    }),
+  )
+
+  const results = $derived([
+    ...all
       .map((i) => ({ i, s: score(i) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => (q ? b.s - a.s : 0))
       .map((x) => x.i),
-  )
+    ...hitItems,
+  ])
 
   const groups = $derived.by(() => {
     const g = new Map<string, Item[]>()
@@ -102,7 +136,7 @@
 <Modal onclose={close} width={600} top label="Search">
   <div class="search">
     <Search size={17} />
-    <input bind:value={q} placeholder="Search ants, colonies, skills and actions" onkeydown={key} />
+    <input bind:value={q} placeholder="Search ants, messages, skills and actions" onkeydown={key} />
     <span class="kbd">esc</span>
   </div>
   <div class="list" bind:this={listEl} role="listbox">

@@ -1,5 +1,5 @@
 // Client for antd: REST calls and the live event stream.
-import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput, Settings } from '@ant/shared'
+import type { AntEvent, ApprovalDecision, Bootstrap, ComputerState, CreateAntInput, SearchHit, Settings } from '@ant/shared'
 
 export class ApiError extends Error {
   status: number
@@ -34,6 +34,7 @@ export const api = {
   pin: (threadId: string, pinned: boolean) => req('PATCH', `/api/threads/${threadId}`, { pinned }),
   decide: (approvalId: string, decision: ApprovalDecision) => req('POST', `/api/approvals/${approvalId}`, { decision }),
   draft: (messageId: string, action: 'send' | 'discard', body?: string) => req('POST', `/api/messages/${messageId}/draft`, { action, body }),
+  search: (q: string) => req<SearchHit[]>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   settings: (patch: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', patch),
   computer: (antId: string) => req<ComputerState>('GET', `/api/ants/${antId}/computer`),
   startComputer: (antId: string) => req<ComputerState>('POST', `/api/ants/${antId}/computer/start`),
