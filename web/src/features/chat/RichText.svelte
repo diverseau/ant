@@ -1,7 +1,7 @@
 <script lang="ts">
   import Ant from '../../lib/ant/Ant.svelte'
   import { parse, type Inline } from '../../lib/rich'
-  import { app, select } from '../../lib/store.svelte'
+  import { app, selectAnt } from '../../lib/store.svelte'
 
   let { text, streaming = false }: { text: string; streaming?: boolean } = $props()
 
@@ -10,7 +10,7 @@
 
 {#snippet inl(parts: Inline[], last: boolean)}
   {#each parts as p}
-    {#if p.t === 'text'}{#each p.v.split('\n') as line, li}{#if li}<br />{/if}{line}{/each}{:else if p.t === 'bold'}<strong>{p.v}</strong>{:else if p.t === 'code'}<code>{p.v}</code>{:else if p.t === 'tag'}<span class="tag">{p.v}</span>{:else if p.t === 'mention'}<button class="mention" onclick={() => select(p.ant.id)}><Ant color={p.ant.color} size={17} />{p.ant.name}</button>{/if}
+    {#if p.t === 'text'}{#each p.v.split('\n') as line, li}{#if li}<br />{/if}{line}{/each}{:else if p.t === 'bold'}<strong>{p.v}</strong>{:else if p.t === 'code'}<code>{p.v}</code>{:else if p.t === 'tag'}<span class="tag">{p.v}</span>{:else if p.t === 'mention'}<button class="mention" onclick={() => selectAnt(p.ant.id)}><Ant color={p.ant.color} size={17} />{p.ant.name}</button>{/if}
   {/each}{#if last && streaming}<span class="caret"></span>{/if}
 {/snippet}
 

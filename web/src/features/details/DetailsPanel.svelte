@@ -5,7 +5,7 @@
   import Trash from '@lucide/svelte/icons/trash-2'
   import Ant from '../../lib/ant/Ant.svelte'
   import { skills } from '../../lib/mock/data'
-  import { app, deleteThread, select, threadById, threadMembers } from '../../lib/store.svelte'
+  import { app, deleteThread, selectAnt, setStatus, threadById, threadForAnt, threadMembers, updateAnt } from '../../lib/store.svelte'
   import Switch from '../../lib/ui/Switch.svelte'
 
   const thread = $derived(threadById(app.selectedId))
@@ -28,13 +28,13 @@
   {#if ant}
     <div class="identity">
       <div class="portrait"><Ant color={ant.color} accessory={ant.accessory} mode="full" size={112} status={ant.status} follow /></div>
-      <input class="name" bind:value={ant.name} aria-label="Name" />
-      <input class="label" bind:value={ant.label} placeholder="Add a label" aria-label="Label" />
+      <input class="name" value={ant.name} aria-label="Name" onchange={(e) => e.currentTarget.value.trim() && updateAnt(ant.id, { name: e.currentTarget.value.trim() })} />
+      <input class="label" value={ant.label ?? ''} placeholder="Add a label" aria-label="Label" onchange={(e) => updateAnt(ant.id, { label: e.currentTarget.value.trim() })} />
     </div>
 
     <section>
       <h3>Instructions</h3>
-      <textarea bind:value={ant.description} rows="4"></textarea>
+      <textarea value={ant.description} rows="4" onchange={(e) => updateAnt(ant.id, { description: e.currentTarget.value })}></textarea>
     </section>
 
     <section>
@@ -78,17 +78,17 @@
           <div class="sub">Stops the current task. Routines stay scheduled.</div>
         </div>
         <Switch
-          bind:checked={() => ant.status === 'paused', (v) => (ant.status = v ? 'paused' : 'idle')}
+          bind:checked={() => ant.status === 'paused', (v) => setStatus(ant.id, v ? 'paused' : 'idle')}
           label="Pause"
         />
       </div>
-      <button class="btn btn-danger" onclick={() => deleteThread(ant.id)}><Trash size={14} /> Delete ant</button>
+      <button class="btn btn-danger" onclick={() => deleteThread(threadForAnt(ant.id)?.id ?? ant.id)}><Trash size={14} /> Delete ant</button>
     </section>
   {:else if thread}
     <section>
       <h3>Members</h3>
       {#each members as m}
-        <button class="item row member" onclick={() => select(m.id)}>
+        <button class="item row member" onclick={() => selectAnt(m.id)}>
           <Ant color={m.color} size={28} status={m.status} />
           <div>
             <div>{m.name}</div>

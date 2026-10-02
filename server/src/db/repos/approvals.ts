@@ -56,3 +56,7 @@ export function expireDue(db: Db, now: number): string[] {
     return ids
   })
 }
+
+export function setApprovalMessage(db: Db, id: string, messageId: string): void {
+  db.prepare('UPDATE approvals SET message_id = ? WHERE id = ?').run(messageId, id)
+}

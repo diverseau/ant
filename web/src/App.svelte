@@ -5,7 +5,10 @@
   import Palette from './features/palette/Palette.svelte'
   import RightPanel from './features/panel/RightPanel.svelte'
   import Sidebar from './features/sidebar/Sidebar.svelte'
-  import { app, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
+  import Toasts from './lib/ui/Toasts.svelte'
+  import { app, init, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
+
+  init()
 
   function shortcuts(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey
@@ -55,6 +58,8 @@
   </main>
   <RightPanel />
 </div>
+
+<Toasts />
 
 {#if app.overlay === 'palette'}
   <Palette />

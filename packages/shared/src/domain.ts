@@ -12,6 +12,8 @@ export interface Ant {
   color: AntColor
   accessory: Accessory
   status: AntStatus
+  /** Live status line set by the ant while it works. */
+  activity?: string
 }
 
 export interface Colony {

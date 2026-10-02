@@ -2,7 +2,7 @@
   import Mail from '@lucide/svelte/icons/mail'
   import Hash from '@lucide/svelte/icons/hash'
   import Check from '@lucide/svelte/icons/check'
-  import { decideApproval, draftAction, threadById } from '../../../lib/store.svelte'
+  import { app, decideApproval, draftAction, threadById } from '../../../lib/store.svelte'
   import type { DraftMessage } from '../../../lib/types'
 
   let { m, threadId }: { m: DraftMessage; threadId: string } = $props()
@@ -21,6 +21,8 @@
 
   function send() {
     draftAction(threadId, m.id, 'sent', body)
+    if (app.mode === 'live') return
+    // Demo only: the scripted draft is paired with an approval card.
     const pending = threadById(threadId)?.messages.find((x) => x.kind === 'approval' && !x.decision && x.author === m.author)
     if (pending) decideApproval(threadId, pending.id, 'once')
   }
