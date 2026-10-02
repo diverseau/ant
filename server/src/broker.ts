@@ -14,8 +14,8 @@ type Waiter = (d: ApprovalDecision) => void
 
 export class Broker {
   private waiters = new Map<string, Waiter>()
-  /** One-shot allowance after the user presses Send on a draft. */
-  private sendGrants = new Map<string, number>()
+  /** One-shot allowance after the user presses Send on a draft, bound to the approved text. */
+  private sendGrants = new Map<string, { until: number; fingerprint: string }>()
   private svc: AntService
   private sweeper: NodeJS.Timeout
 
@@ -45,7 +45,7 @@ export class Broker {
     const folder = this.svc.pathsFor(antId).folder
     const verdict = decide(tool, input, { folder, rules: this.rulesFor(antId) })
 
-    if (verdict.behaviour === 'ask' && SEND_TOOL.test(tool) && this.consumeSendGrant(antId)) {
+    if (verdict.behaviour === 'ask' && SEND_TOOL.test(tool) && this.consumeSendGrant(antId, input)) {
       return { behavior: 'allow', updatedInput: input }
     }
     if (verdict.behaviour === 'allow') return { behavior: 'allow', updatedInput: input }
@@ -178,13 +178,15 @@ export class Broker {
     }
   }
 
-  grantSend(antId: string) {
-    this.sendGrants.set(antId, Date.now() + 5 * 60_000)
+  grantSend(antId: string, body: string) {
+    this.sendGrants.set(antId, { until: Date.now() + 5 * 60_000, fingerprint: fingerprint(body) })
   }
 
-  private consumeSendGrant(antId: string): boolean {
-    const until = this.sendGrants.get(antId)
-    if (!until || until < Date.now()) return false
+  /** Only the message the user approved may go out without asking again. */
+  private consumeSendGrant(antId: string, input: unknown): boolean {
+    const g = this.sendGrants.get(antId)
+    if (!g || g.until < Date.now()) return false
+    if (!normalise(JSON.stringify(input ?? {}).replace(/\\n/g, ' ')).includes(g.fingerprint)) return false
     this.sendGrants.delete(antId)
     return true
   }
@@ -192,6 +194,15 @@ export class Broker {
   shutdown() {
     clearInterval(this.sweeper)
   }
+}
+
+function normalise(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/** Whitespace/case-insensitive leading chunk of a message, to match it inside tool input. */
+function fingerprint(text: string): string {
+  return normalise(text).slice(0, 60)
 }
 
 export function targetsSelf(text: string, ports: number[]): boolean {

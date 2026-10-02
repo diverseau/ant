@@ -18,6 +18,7 @@ import { HttpError, type AntService } from '../service.ts'
 
 const WEB_DIST = fileURLToPath(new URL('../../../web/dist/', import.meta.url))
 const ALLOWED_ORIGINS = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 
 const colors = z.enum(['coral', 'purple', 'yellow', 'green', 'blue'])
 const accessories = z.enum(['none', 'satchel', 'leaf', 'wrench', 'glasses'])
@@ -35,10 +36,16 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   const app = new Hono()
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
 
-  // Local-only service: refuse cross-site requests from other origins in the browser.
+  // Local-only service: refuse cross-site requests (Origin) and DNS rebinding (Host).
+  // ANT_ALLOWED_HOSTS adds names for remote setups (e.g. a Tailscale hostname).
+  const extraHosts = (process.env.ANT_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
   app.use('*', async (c, next) => {
     const origin = c.req.header('origin')
-    if (origin && !ALLOWED_ORIGINS.test(origin)) return c.json({ error: 'Forbidden origin' }, 403)
+    const host = (c.req.header('host') ?? '').toLowerCase().replace(/:\d+$/, '')
+    const hostOk = LOCAL_HOSTS.has(host) || extraHosts.includes(host)
+    // Webhooks are called by other machines when Ant is exposed; they carry their own key.
+    if (!hostOk && !c.req.path.startsWith('/hooks/')) return c.json({ error: 'Forbidden host' }, 403)
+    if (origin && !ALLOWED_ORIGINS.test(origin) && !extraHosts.some((h) => origin.toLowerCase().includes(`//${h}`))) return c.json({ error: 'Forbidden origin' }, 403)
     await next()
   })
 
@@ -129,7 +136,7 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     const finalBody = b.body ?? p.body
     svc.patch(m.id, { state: b.action === 'send' ? 'sent' : 'discarded', body: finalBody })
     if (b.action === 'send') {
-      broker.grantSend(m.author)
+      broker.grantSend(m.author, finalBody)
       svc.enqueue(m.author, {
         threadId: m.threadId,
         text: `[${svc.userName}] Approved. Send this ${p.channel === 'slack' ? 'Slack message' : 'email'} to ${p.to} now, exactly as written below, then confirm in one line. If you have no tool that can send it, say so.\n\n${p.subject ? `Subject: ${p.subject}\n\n` : ''}${finalBody}`,
