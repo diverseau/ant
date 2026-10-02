@@ -86,7 +86,7 @@ export class AntService {
   bootstrap(health: Bootstrap['health']): Bootstrap {
     const threads = R.listThreads(this.db).map((t) => toThread(t, R.listMessages(this.db, t.id, { limit: 80 })))
     return {
-      user: { name: this.userName, plan: R.getSetting(this.db, 'user.plan', 'Max') },
+      user: { name: this.userName, plan: planLabel(health.claude.plan) },
       ants: R.listAnts(this.db).map((a) => this.view(a)),
       colonies: R.listColonies(this.db).map(toColony),
       threads,
@@ -700,6 +700,11 @@ function memoryBlocks(memoryPath: string, userPath: string) {
   const store = new MemoryStore({ memoryPath, userPath })
   const bullets = (entries: string[]) => entries.map((e) => `- ${e.replace(/\n/g, '\n  ')}`).join('\n')
   return { memoryBlock: bullets(store.read('memory')), userBlock: bullets(store.read('user')) }
+}
+
+function planLabel(plan?: string): string {
+  if (!plan) return ''
+  return plan.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function limitText(text: string): string | null {

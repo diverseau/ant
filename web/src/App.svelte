@@ -7,6 +7,7 @@
   import Sidebar from './features/sidebar/Sidebar.svelte'
   import UsagePanel from './features/usage/UsagePanel.svelte'
   import Toasts from './lib/ui/Toasts.svelte'
+  import FileViewer from './lib/ui/FileViewer.svelte'
   import { app, init, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
 
   init()
@@ -61,6 +62,10 @@
 </div>
 
 <Toasts />
+
+{#if app.viewer}
+  <FileViewer />
+{/if}
 
 {#if app.overlay === 'palette'}
   <Palette />

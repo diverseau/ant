@@ -52,18 +52,20 @@ function health(): Health {
   let version: string | undefined
   let loggedIn = false
   let authMethod: string | undefined
+  let plan: string | undefined
   try {
     version = execFileSync(cfg.claudeBin, ['--version'], { encoding: 'utf8', timeout: 10_000 }).trim().split(' ')[0]
     // Reads only the method and status, never credentials.
     const status = JSON.parse(execFileSync(cfg.claudeBin, ['auth', 'status'], { encoding: 'utf8', timeout: 10_000 }))
     loggedIn = !!status.loggedIn
     authMethod = status.authMethod
+    plan = typeof status.subscriptionType === 'string' ? status.subscriptionType : undefined
   } catch {
     // claude missing or not signed in
   }
   const missing = ['bwrap', 'socat'].filter((b) => !which(b))
   const value: Health = {
-    claude: { found: !!version, version, loggedIn, authMethod },
+    claude: { found: !!version, version, loggedIn, authMethod, plan },
     sandbox: { ok: missing.length === 0, missing },
     antHome: cfg.antHome,
     version: cfg.version,

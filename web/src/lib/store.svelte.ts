@@ -35,6 +35,8 @@ export const app = $state({
   health: null as Health | null,
   notices: [] as Notice[],
   computers: {} as Record<string, ComputerState>,
+  /** File open in the viewer. */
+  viewer: null as { antId: string; path: string; name: string } | null,
 })
 
 const live = () => app.mode === 'live'

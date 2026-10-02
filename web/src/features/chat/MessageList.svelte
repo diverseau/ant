@@ -146,7 +146,7 @@
               {:else if m.kind === 'tool'}
                 <ToolGroup messages={row.tools} />
               {:else if m.kind === 'file'}
-                <FileCard {m} />
+                <FileCard {m} onopen={(path) => app.mode === 'live' && (app.viewer = { antId: m.author, path, name: m.name })} />
               {:else if m.kind === 'error'}
                 <ErrorCard {m} />
               {/if}

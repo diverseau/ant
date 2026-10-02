@@ -15,7 +15,7 @@ export interface Bootstrap {
 }
 
 export interface Health {
-  claude: { found: boolean; version?: string; loggedIn: boolean; authMethod?: string }
+  claude: { found: boolean; version?: string; loggedIn: boolean; authMethod?: string; plan?: string }
   sandbox: { ok: boolean; missing: string[] }
   antHome: string
   version: string

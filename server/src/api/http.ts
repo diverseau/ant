@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { extname, join, normalize } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { basename, extname, join, normalize, resolve } from 'node:path'
+import { insideFolder } from '../rules/engine.ts'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createNodeWebSocket } from '@hono/node-ws'
@@ -294,6 +295,25 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.json({ started: true }, 202)
   })
 
+  // Files an ant made, for the file card's Open. Only inside that ant's folder.
+  app.get('/api/ants/:id/file', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const folder = svc.pathsFor(id).folder
+    const rel = c.req.query('path') ?? ''
+    const abs = resolve(folder, rel)
+    if (!insideFolder(folder, abs) || !existsSync(abs) || !statSync(abs).isFile()) throw new HttpError(404, 'No such file')
+    if (/(^|\/)\.|(^|\/)browser\//.test(rel)) throw new HttpError(403, 'Not shareable')
+    const size = statSync(abs).size
+    if (size > 20 * 1024 * 1024) throw new HttpError(413, 'File too large to preview')
+    const type = MIME[extname(abs).toLowerCase()] ?? (TEXT_EXT.test(abs) ? 'text/plain; charset=utf-8' : 'application/octet-stream')
+    return c.body(readFileSync(abs), 200, {
+      'content-type': type,
+      'content-disposition': `${c.req.query('download') ? 'attachment' : 'inline'}; filename="${basename(abs).replace(/"/g, '')}"`,
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
+    })
+  })
+
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)
@@ -331,7 +351,17 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   return server
 }
 
+const TEXT_EXT = /\.(md|txt|csv|tsv|log|ts|tsx|js|jsx|py|rb|go|rs|java|c|h|cpp|sh|yaml|yml|toml|ini|xml|sql|svelte|vue|css|scss)$/i
+
 const MIME: Record<string, string> = {
+  '.md': 'text/markdown; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
   '.css': 'text/css',
