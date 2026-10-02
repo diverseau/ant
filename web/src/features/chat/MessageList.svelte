@@ -1,6 +1,7 @@
 <script lang="ts">
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import Copy from '@lucide/svelte/icons/copy'
+  import Paperclip from '@lucide/svelte/icons/paperclip'
   import ThumbsUp from '@lucide/svelte/icons/thumbs-up'
   import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw'
@@ -45,6 +46,19 @@
   const typingId = $derived(app.typing[thread.id])
   const last = $derived(thread.messages.at(-1))
   const showTyping = $derived(!!typingId && !(last?.kind === 'text' && last.streaming))
+
+  /** User messages end with "[Attached: inbox/a.png, …]" (composer); show those as chips. */
+  function splitAttached(text: string): { text: string; files: string[] } | null {
+    const m = text.match(/\n*\[Attached: ([^\]]+)\]\s*$/)
+    if (!m) return null
+    return { text: text.slice(0, m.index).trim() || ' ', files: m[1].split(',').map((f) => f.trim()).filter(Boolean) }
+  }
+
+  function openAttachment(path: string) {
+    if (app.mode !== 'live') return
+    const antId = thread.kind === 'ant' ? thread.refId : (app.colonies.find((c) => c.id === thread.refId)?.memberIds[0] ?? '')
+    app.viewer = { antId, path, name: path.split('/').pop() ?? path }
+  }
 
   let scroller: HTMLDivElement | undefined = $state()
   let focused: string | null = $state(null)
@@ -139,7 +153,15 @@
             <div class="content">
               {#if m.kind === 'text'}
                 <div class="bubble" class:mine={m.author === 'user'}>
-                  <RichText text={m.text} streaming={m.streaming} />
+                  {@const att = m.author === 'user' ? splitAttached(m.text) : null}
+                  <RichText text={att ? att.text : m.text} streaming={m.streaming} />
+                  {#if att?.files.length}
+                    <div class="att">
+                      {#each att.files as f}
+                        <button class="att-chip" onclick={() => openAttachment(f)}><Paperclip size={12} />{f.split('/').pop()}</button>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if m.author !== 'user' && !m.streaming && m !== last}
                     <div class="hoverbar">
                       <button class="icon-btn sm" aria-label="Copy" onclick={() => copy(m)}>
@@ -279,6 +301,32 @@
     border-radius: var(--r-2xl);
     background: var(--bg-bubble);
     max-width: 100%;
+  }
+
+  .att {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .att-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: var(--r-full);
+    background: rgb(255 255 255 / 0.08);
+    font-size: var(--text-xs);
+    color: var(--text-soft);
+    transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-out);
+  }
+
+  .att-chip:hover {
+    background: rgb(255 255 255 / 0.14);
+    transform: translateY(-1px);
   }
 
   .bubble.mine {

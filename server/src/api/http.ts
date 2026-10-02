@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, normalize, resolve } from 'node:path'
 import { insideFolder } from '../rules/engine.ts'
 import { antDataDir } from '../config.ts'
@@ -74,6 +74,30 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     svc.sendFromUser(c.req.param('id'), b.text)
     return c.body(null, 202)
   })
+  // Attachments land in the receiving ant's inbox/ (for a colony: its lead's).
+  app.post('/api/threads/:id/attachments', async (c) => {
+    const thread = R.getThread(svc.db, c.req.param('id'))
+    if (!thread) throw new HttpError(404, 'No such thread')
+    const antId = thread.kind === 'ant' ? thread.refId : (R.getColony(svc.db, thread.refId)?.leadAntId ?? R.getColony(svc.db, thread.refId)?.memberIds[0])
+    if (!antId) throw new HttpError(400, 'No ant to receive files')
+    const form = await c.req.parseBody({ all: true })
+    const files = ([] as unknown[]).concat(form.file ?? []).filter((f): f is File => f instanceof File)
+    if (!files.length) throw new HttpError(400, 'No files')
+    if (files.length > 6) throw new HttpError(400, 'Up to 6 files at a time')
+    const inbox = join(svc.pathsFor(antId).folder, 'inbox')
+    mkdirSync(inbox, { recursive: true })
+    const saved: { name: string; path: string; bytes: number }[] = []
+    for (const f of files) {
+      if (f.size > 25 * 1024 * 1024) throw new HttpError(413, `${f.name} is over 25 MB`)
+      const safe = basename(f.name).replace(/[^\w.\- ]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file'
+      let name = safe
+      for (let i = 2; existsSync(join(inbox, name)); i++) name = safe.replace(/(\.[^.]*)?$/, ` (${i})$1`)
+      writeFileSync(join(inbox, name), Buffer.from(await f.arrayBuffer()))
+      saved.push({ name, path: `inbox/${name}`, bytes: f.size })
+    }
+    return c.json({ antId, files: saved }, 201)
+  })
+
   app.post('/api/threads/:id/stop', (c) => {
     svc.stopThread(c.req.param('id'))
     return c.body(null, 202)

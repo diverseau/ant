@@ -12,7 +12,7 @@
   import Ant from '../../lib/ant/Ant.svelte'
   import { connectors, skills } from '../../lib/mock/data'
   import { pop, popOut } from '../../lib/motion'
-  import { app, send, stop, threadMembers } from '../../lib/store.svelte'
+  import { app, notify, send, stop, threadMembers } from '../../lib/store.svelte'
   import type { Thread } from '../../lib/types'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
 
@@ -27,7 +27,45 @@
 
   const value = $derived(app.drafts[thread.id] ?? '')
   const working = $derived(!!app.typing[thread.id])
-  const canSend = $derived(value.trim().length > 0)
+  // Attachments: uploaded straight away into the ant's inbox/, named in the message on send.
+  type Attachment = { id: string; name: string; path?: string; bytes: number; state: 'uploading' | 'ready' | 'error'; error?: string }
+  let attachments: Attachment[] = $state([])
+  let fileInput: HTMLInputElement | undefined = $state()
+  let dragging = $state(false)
+  const uploading = $derived(attachments.some((a) => a.state === 'uploading'))
+  const canSend = $derived((value.trim().length > 0 || attachments.some((a) => a.state === 'ready')) && !uploading)
+
+  async function addFiles(list: FileList | File[] | null) {
+    const files = [...(list ?? [])]
+    if (!files.length) return
+    if (app.mode !== 'live') {
+      notify('Attachments need antd running.')
+      return
+    }
+    for (const f of files.slice(0, 6 - attachments.length)) {
+      const a: Attachment = { id: crypto.randomUUID(), name: f.name, bytes: f.size, state: 'uploading' }
+      attachments.push(a)
+      const live = attachments[attachments.length - 1]
+      const form = new FormData()
+      form.append('file', f)
+      fetch(`/api/threads/${thread.id}/attachments`, { method: 'POST', body: form })
+        .then(async (r) => {
+          const j = await r.json()
+          if (!r.ok) throw new Error(j.error ?? 'Upload failed')
+          live.path = j.files[0].path
+          live.name = j.files[0].name
+          live.state = 'ready'
+        })
+        .catch((err) => {
+          live.state = 'error'
+          live.error = String(err.message ?? err)
+        })
+    }
+  }
+
+  function removeAttachment(id: string) {
+    attachments = attachments.filter((a) => a.id !== id)
+  }
 
   type Option = { key: string; label: string; sub: string; insert: string; ant?: (typeof app.ants)[number]; icon?: 'skill' | 'plug' }
 
@@ -99,7 +137,10 @@
 
   function submit() {
     if (!canSend) return
-    send(value)
+    const ready = attachments.filter((a) => a.state === 'ready' && a.path)
+    const note = ready.length ? `\n\n[Attached: ${ready.map((a) => a.path).join(', ')}]` : ''
+    send((value.trim() || 'See the attached files.') + note)
+    attachments = []
     listening = false
   }
 
@@ -133,7 +174,7 @@
       x: r.left,
       y: r.top - 150,
       items: [
-        { label: 'Upload a file', icon: Paperclip, onclick: () => {} },
+        { label: 'Upload a file', icon: Paperclip, onclick: () => fileInput?.click() },
         { label: 'Take a screenshot', icon: Camera, onclick: () => {} },
         { label: 'Use a skill', icon: Sparkles, hint: '/', onclick: () => insertTrigger('/') },
         { label: 'Attach a connector', icon: Plug, hint: '@', onclick: () => insertTrigger('@') },
@@ -189,7 +230,28 @@
     </div>
   {/if}
 
-  <div class="box" class:listening>
+  <input bind:this={fileInput} type="file" multiple hidden onchange={(e) => { addFiles(e.currentTarget.files); e.currentTarget.value = '' }} />
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="box"
+    class:listening
+    class:dragging
+    ondragover={(e) => { e.preventDefault(); dragging = true }}
+    ondragleave={() => (dragging = false)}
+    ondrop={(e) => { e.preventDefault(); dragging = false; addFiles(e.dataTransfer?.files ?? null) }}
+    onpaste={(e) => { if (e.clipboardData?.files.length) { e.preventDefault(); addFiles(e.clipboardData.files) } }}
+  >
+    {#if attachments.length}
+      <div class="chips">
+        {#each attachments as a (a.id)}
+          <span class="chip {a.state}" title={a.error ?? a.name} in:pop out:popOut>
+            {#if a.state === 'uploading'}<span class="spin"></span>{:else}<Paperclip size={12} />{/if}
+            <span class="cname">{a.name}</span>
+            <button aria-label="Remove {a.name}" onclick={() => removeAttachment(a.id)}>×</button>
+          </span>
+        {/each}
+      </div>
+    {/if}
     <textarea
       bind:this={ta}
       data-composer
@@ -266,6 +328,70 @@
     box-shadow:
       0 0 0 4px rgb(255 255 255 / 0.025),
       0 14px 34px -14px rgb(0 0 0 / 0.7);
+  }
+
+  .box.dragging {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 14px 0;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 240px;
+    height: 28px;
+    padding: 0 4px 0 10px;
+    border-radius: var(--r-full);
+    background: var(--bg-active);
+    font-size: var(--text-xs);
+    color: var(--text-soft);
+  }
+
+  .chip.error {
+    background: rgb(229 96 79 / 0.15);
+    color: #f4a69b;
+  }
+
+  .cname {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chip button {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: var(--text-muted);
+    transition: background var(--dur-fast);
+  }
+
+  .chip button:hover {
+    background: var(--bg-selected);
+    color: var(--text);
+  }
+
+  .spin {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-faint);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .box.listening {
