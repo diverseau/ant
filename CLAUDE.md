@@ -11,7 +11,7 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 
 ## Status
 
-`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Done: ants, chat, approvals, colonies routing, ant-to-ant, memory, browser computer with take-over, usage. Next: routines, colony/connector/secret/skill UIs, channels (see `docs/plan-backend-v1.md` §17).
+`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Release 0.9.0 (see `CHANGELOG.md`) covers the whole v1 plan. Open: full-desktop computer use (needs TigerVNC + cua-driver), verifying the Docker image on a machine with Docker access, live-testing channels with real bot tokens.
 
 ## Commands
 
