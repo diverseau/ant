@@ -1,0 +1,14 @@
+{
+  "name": "ant",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["web", "server", "packages/*"],
+  "scripts": {
+    "dev:web": "npm -w web run dev",
+    "dev:server": "npm -w @ant/server run dev",
+    "check": "npm -ws --if-present run check",
+    "test": "npm -ws --if-present run test",
+    "build": "npm -ws --if-present run build"
+  }
+}
