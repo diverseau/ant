@@ -30,12 +30,14 @@ export class IpcServer {
 
   listen(): Promise<void> {
     rmSync(this.path, { force: true })
-    return new Promise((resolve) =>
+    return new Promise((resolve, reject) => {
+      this.server.once('error', reject)
       this.server.listen(this.path, () => {
+        this.server.off('error', reject)
         chmodSync(this.path, 0o600)
         resolve()
-      }),
-    )
+      })
+    })
   }
 
   close() {

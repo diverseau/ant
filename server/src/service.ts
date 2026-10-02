@@ -342,7 +342,8 @@ export class AntService {
       paths,
       current: null,
       runId: null,
-      costBase: 0,
+      // total_cost_usd is cumulative for the whole session, including before a resume.
+      costBase: known ? R.getSetting<number>(this.db, `ant.${antId}.costBase`, 0) : 0,
       texts: new Map(),
       tools: new Map(),
       lastText: '',
@@ -460,6 +461,7 @@ export class AntService {
       case 'result': {
         const cost = Math.max(0, e.totalCostUsd - l.costBase)
         l.costBase = e.totalCostUsd
+        R.setSetting(this.db, `ant.${antId}.costBase`, e.totalCostUsd)
         if (l.runId) {
           R.updateRun(this.db, l.runId, {
             status: e.ok ? 'succeeded' : e.subtype === 'error_during_execution' ? 'stopped' : 'failed',
@@ -520,7 +522,10 @@ export class AntService {
     if (l.current) {
       const detail = info.stderr.trim().split('\n').slice(-12).join('\n') || `exit ${info.code ?? info.signal}`
       // A missing/expired session can't be resumed; start fresh next time.
-      if (/No conversation found|session.*not found/i.test(info.stderr)) R.setSetting(this.db, `ant.${antId}.session`, null)
+      if (/No conversation found|session.*not found/i.test(info.stderr)) {
+        R.setSetting(this.db, `ant.${antId}.session`, null)
+        R.setSetting(this.db, `ant.${antId}.costBase`, 0)
+      }
       if (l.runId) R.updateRun(this.db, l.runId, { status: 'failed', endedAt: Date.now(), error: detail })
       const turn = l.current
       this.finishTurn(antId, l, false)
