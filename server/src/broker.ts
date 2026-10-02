@@ -1,5 +1,6 @@
 // Permission broker (plan §4): turns Claude Code permission prompts and ants' own
 // request_approval calls into approval cards, and waits for the user.
+import { execFile } from 'node:child_process'
 import type { ApprovalDecision } from '@ant/shared'
 import * as R from './db/repos/index.ts'
 import { describeTool } from './rules/describe.ts'
@@ -98,6 +99,7 @@ export class Broker {
     R.setApprovalMessage(svc.db, approval.id, msg.id)
     svc.setStatus(antId, 'attention')
     svc.emit({ type: 'notice', level: 'warn', text: `${R.getAnt(svc.db, antId)?.name ?? 'An ant'} needs you on its computer` })
+    desktopNotify(R.getAnt(svc.db, antId)?.name ?? 'An ant', `Needs you on its computer: ${reason}`)
     const decision = await new Promise<ApprovalDecision>((resolve) => this.waiters.set(approval.id, resolve))
     if (decision === 'deny') return `${svc.userName} declined to take over. Continue without it or explain what's blocked.`
     return `${svc.userName} finished on the computer and handed it back. Check the page state and carry on.`
@@ -132,6 +134,8 @@ export class Broker {
     })
     R.setApprovalMessage(svc.db, approval.id, msg.id)
     svc.setStatus(antId, 'attention')
+    // Nobody may be watching an unattended run: tell the desktop, it expires in 10 minutes.
+    if (unattended) desktopNotify(R.getAnt(svc.db, antId)?.name ?? 'An ant', `Needs your approval: ${a.action}`)
     return new Promise((resolve) => this.waiters.set(approval.id, resolve))
   }
 
@@ -184,6 +188,11 @@ export class Broker {
   shutdown() {
     clearInterval(this.sweeper)
   }
+}
+
+function desktopNotify(title: string, body: string) {
+  if (process.env.ANT_NO_DESKTOP_NOTIFY) return
+  execFile('notify-send', ['-a', 'Ant', '-u', 'critical', title, body], () => {})
 }
 
 function capitalise(s: string) {

@@ -115,7 +115,7 @@ export function registerTools(svc: AntService, broker: Broker, scheduler: Schedu
     const ant = R.getAnt(svc.db, antId)
     const text = str(p.text).slice(0, 200)
     svc.emit({ type: 'notice', level: p.urgency === 'high' ? 'warn' : 'info', text: `${ant?.name ?? 'An ant'}: ${text}` })
-    execFile('notify-send', ['-a', 'Ant', `-u`, p.urgency === 'high' ? 'critical' : 'normal', ant?.name ?? 'Ant', text], () => {})
+    if (!process.env.ANT_NO_DESKTOP_NOTIFY) execFile('notify-send', ['-a', 'Ant', `-u`, p.urgency === 'high' ? 'critical' : 'normal', ant?.name ?? 'Ant', text], () => {})
     return 'Notified.'
   })
 }
