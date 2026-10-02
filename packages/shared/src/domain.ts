@@ -20,6 +20,8 @@ export interface Colony {
   id: string
   name: string
   memberIds: string[]
+  /** Gets messages that don't @mention anyone. */
+  leadAntId?: string | null
 }
 
 /** A sidebar entry: a 1:1 chat with an ant, or a colony. */

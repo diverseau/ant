@@ -229,8 +229,19 @@ export class AntService {
     R.archiveAnt(this.db, id)
   }
 
-  createColony(name: string, memberIds: string[]) {
-    if (memberIds.length < 2) throw new HttpError(400, 'A colony needs at least two ants')
+  /** Colonies hold 2–6 distinct, existing ants. */
+  validateMembers(memberIds: string[]): string[] {
+    const ids = [...new Set(memberIds)]
+    if (ids.length < 2 || ids.length > 6) throw new HttpError(400, 'A colony needs between 2 and 6 ants')
+    for (const id of ids) {
+      const a = R.getAnt(this.db, id)
+      if (!a || a.archived) throw new HttpError(400, 'Every member must be an existing ant')
+    }
+    return ids
+  }
+
+  createColony(name: string, memberIdsIn: string[]) {
+    const memberIds = this.validateMembers(memberIdsIn)
     const c = R.createColony(this.db, { name: name.trim() || 'New colony', memberIds, leadAntId: memberIds[0] })
     const t = R.createThread(this.db, { kind: 'colony', refId: c.id })
     this.emit({ type: 'colony.updated', colony: toColony(c) })

@@ -17,7 +17,7 @@ export function toAnt(row: R.Ant): Ant {
 }
 
 export function toColony(row: R.Colony): Colony {
-  return { id: row.id, name: row.name, memberIds: row.memberIds }
+  return { id: row.id, name: row.name, memberIds: row.memberIds, leadAntId: row.leadAntId }
 }
 
 export function toMessage(row: R.Message): Message {
