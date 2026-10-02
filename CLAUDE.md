@@ -4,6 +4,9 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 
 - Research on the reference products: `docs/README.md`
 - Frontend plan and locked decisions: `docs/plan-frontend-v1.md`
+- Backend plan (Claude Code CLI runtime, ant folders, safety, colonies, computer): `docs/plan-backend-v1.md`
+- Hermes Agent reference clone (MIT, read-only, gitignored, never run it): `reference/hermes-agent`
+- Delegation to Codex (gpt-6.1-sol, high) for bulk work, and what stays with Claude: `docs/delegation.md`. Run tasks with `scripts/codex-task.sh`.
 - Visual references (sample colours from these, don't guess): `docs/refs/`
 
 ## Status

@@ -25,3 +25,9 @@ coverage/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Read-only reference clones (not part of Ant)
+reference/
+
+# Codex delegation worktrees and logs
+.worktrees/
