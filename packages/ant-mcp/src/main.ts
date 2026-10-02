@@ -115,6 +115,16 @@ server.registerTool(
 )
 
 server.registerTool(
+  'create_ant',
+  {
+    description:
+      'Propose a new specialist ant (a helper) when a recurring kind of work deserves its own agent. The user must approve. Give it a short name, a job label and complete standing instructions, including what it must never do.',
+    inputSchema: { name: z.string(), job: z.string().optional(), instructions: z.string() },
+  },
+  (args) => call('create_ant', args),
+)
+
+server.registerTool(
   'post_to_colony',
   { description: 'Post a message into a colony chat you are a member of.', inputSchema: { colony: z.string().describe('Colony name'), text: z.string() } },
   (args) => call('post_to_colony', args),

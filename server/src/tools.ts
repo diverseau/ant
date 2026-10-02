@@ -59,6 +59,23 @@ export function registerTools(svc: AntService, broker: Broker, scheduler: Schedu
   })
 
   ipc.on('message_ant', (antId, p) => svc.messageAnt(antId, str(p.to), str(p.text)))
+
+  // Helper ants (plan §6): an ant may propose a new specialist; the user approves it.
+  ipc.on('create_ant', async (antId, p) => {
+    const name = str(p.name).trim().slice(0, 40)
+    const job = str(p.job).trim().slice(0, 40)
+    const instructions = str(p.instructions).trim()
+    if (!name || !instructions) return 'A helper needs a name and instructions.'
+    const ok = await broker.requestApproval(antId, { action: `Hatch a new ant: ${name}${job ? ` (${job})` : ''}`, detail: instructions.slice(0, 300), risk: 'medium' })
+    if (!/^Approved/.test(ok)) return `Not created: ${ok}`
+    const colors = ['coral', 'purple', 'yellow', 'green', 'blue'] as const
+    try {
+      const ant = svc.createAnt({ name, label: job || undefined, description: instructions, color: colors[R.listAnts(svc.db).length % colors.length], accessory: 'none' })
+      return `Hatched ${ant.name}. Use message_ant to give it work.`
+    } catch (err) {
+      return `Not created: ${err instanceof Error ? err.message : String(err)}`
+    }
+  })
   ipc.on('post_to_colony', (antId, p) => svc.postToColony(antId, str(p.colony), str(p.text)))
 
   ipc.on('memory', (antId, p) => memory(svc, antId, p))
