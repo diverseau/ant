@@ -1,0 +1,34 @@
+name: ant
+services:
+  ant:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: ant:local
+    user: "1000:1000"
+    environment:
+      ANT_HOME: /home/ant/Ants
+      ANT_DATA_DIR: /home/ant/.local/share/ant
+      ANT_SOCKET: /home/ant/.local/share/ant/antd.sock
+      ANT_PORT: "7420"
+      ANT_HOST: 0.0.0.0
+      ANT_IN_CONTAINER: "1"
+      ANT_CLAUDE_BIN: /home/ant/.local/bin/claude
+      ANT_MODEL: ${ANT_MODEL:-sonnet}
+      CLAUDE_CONFIG_DIR: /home/ant/.claude
+    volumes:
+      - ant-home:/home/ant/Ants
+      - ant-data:/home/ant/.local/share/ant
+      - ant-claude:/home/ant/.claude
+    ports:
+      # Use an SSH tunnel (optionally over Tailscale) for remote access.
+      # Never bind 0.0.0.0 on the host without an authentication layer.
+      - "127.0.0.1:7420:7420"
+    shm_size: 1gb
+    init: true
+    restart: unless-stopped
+
+volumes:
+  ant-home:
+  ant-data:
+  ant-claude:

@@ -77,6 +77,8 @@ export class AntBrowser {
         '--password-store=basic',
         '--disable-features=Translate,MediaRouter',
         '--hide-scrollbars',
+        // In the Ant container Chromium can't create its own sandbox; the container is the boundary.
+        ...(process.env.ANT_IN_CONTAINER === '1' ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
         'about:blank',
       ],
       { stdio: 'ignore', detached: false },
