@@ -11,7 +11,7 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 
 ## Status
 
-`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Release 0.9.0 (see `CHANGELOG.md`) covers the whole v1 plan. Since then (unreleased, see `CHANGELOG.md`): pickers, dictation, device pairing + Tailscale remote access, phone layout, installable app with push. Open items are tracked in `docs/audit-vs-reference.md`; full-desktop computer use still needs TigerVNC + cua-driver, channels need live bot tokens.
+`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Release 0.10.0 (see `CHANGELOG.md`) adds phone access (device pairing, Tailscale, push), event routines (GitHub, Slack, page watches), the rule editor, secure secret cards, skills/memory UI, Activity, templates and dictation on top of the v1 plan. Open items are tracked in `docs/audit-vs-reference.md` (full-desktop computer use needs TigerVNC; channels need live bot tokens).
 
 ## Commands
 
@@ -51,6 +51,6 @@ From the repo root (npm workspaces):
 
 ## Conventions
 
-- Semantic versioning (all workspace `package.json` files share one version, currently `0.9.0`) and Conventional Commits (`feat:`, `fix:`, `perf:`…).
+- Semantic versioning (all workspace `package.json` files share one version, currently `0.10.0`) and Conventional Commits (`feat:`, `fix:`, `perf:`…).
 - Match the style of surrounding code. TypeScript strict, Svelte 5 runes only (no legacy `$:` or stores).
 - Never commit secrets. Use `.env` (gitignored) and keep `.env.example` current.

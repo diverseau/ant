@@ -2,7 +2,9 @@
 
 All notable changes to Ant. Versions follow [Semantic Versioning](https://semver.org); commits follow Conventional Commits.
 
-## Unreleased
+## 0.10.0 — 2026-10-03
+
+Ant on your phone, ants that react to events, and much more control over what they do.
 
 ### Added
 - Model, effort and permission pickers under the chat box, per ant. Models: Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Opus 5, Sonnet 5, Haiku 4.5, plus seven legacy models; search, favourites and Ctrl+1–6 in the menu.
