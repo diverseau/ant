@@ -17,6 +17,7 @@ import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
 import { LogoCache } from '../connectors/logos.ts'
+import { MAX_AUDIO_BYTES, transcribe } from '../dictation/transcribe.ts'
 
 const WEB_DIST = fileURLToPath(new URL('../../../web/dist/', import.meta.url))
 const ALLOWED_ORIGINS = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -454,6 +455,19 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     if (scope === 'colony') for (const a of R.listAnts(svc.db)) svc.skills.sync(svc.pathsFor(a.id).folder)
     svc.emit({ type: 'skills.updated' })
     return c.body(null, 204)
+  })
+
+  // Composer mic: the raw recording in the body, transcribed locally.
+  app.post('/api/dictation', async (c) => {
+    if (Number(c.req.header('content-length') ?? 0) > MAX_AUDIO_BYTES) throw new HttpError(413, 'Recording too long')
+    const audio = Buffer.from(await c.req.arrayBuffer())
+    if (!audio.length) throw new HttpError(400, 'No audio')
+    if (audio.length > MAX_AUDIO_BYTES) throw new HttpError(413, 'Recording too long')
+    try {
+      return c.json({ text: await transcribe(svc.cfg, audio) })
+    } catch (err) {
+      throw new HttpError(502, `Dictation failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
   })
 
   const logos = new LogoCache(svc.cfg.dataDir)

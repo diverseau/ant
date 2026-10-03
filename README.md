@@ -6,7 +6,7 @@ Ant runs the official **Claude Code** CLI under your own Claude subscription. No
 
 ## Quick start
 
-Requirements: Linux, Node 26+, [Claude Code](https://code.claude.com) signed in (`claude`, then `/login`), `bubblewrap` and `socat` for the sandbox, and Chromium for the ants' browser.
+Requirements: Linux, Node 26+, [Claude Code](https://code.claude.com) signed in (`claude`, then `/login`), `bubblewrap` and `socat` for the sandbox, and Chromium for the ants' browser. Optional: `ffmpeg` and `voxtype` for the composer's mic (speech is transcribed locally).
 
 ```bash
 npm install

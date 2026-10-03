@@ -17,6 +17,8 @@ check "socat (sandbox network proxy)" socat socat socat socat
 if have chromium || have chromium-browser || have google-chrome-stable || have google-chrome; then echo "  ✓ Chromium (ant browsers)"; else echo "  ✗ Chromium (ant browsers)"; need+=("chromium|chromium|chromium"); fi
 check "notify-send (desktop notifications, optional)" notify-send libnotify libnotify-bin libnotify
 check "secret-tool (keyring for secrets, optional)" secret-tool libsecret libsecret-tools libsecret
+check "ffmpeg (dictation, optional)" ffmpeg ffmpeg ffmpeg ffmpeg
+if have voxtype; then echo "  ✓ voxtype (dictation, optional)"; else echo "  ✗ voxtype (dictation, optional): local Whisper speech-to-text; Omarchy ships it"; fi
 
 if have claude && ! claude auth status >/dev/null 2>&1; then echo; echo "Claude Code isn't signed in. Run: claude   then /login"; fi
 

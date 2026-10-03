@@ -1,5 +1,6 @@
 // antd: the Ant daemon.
 import { execFileSync } from 'node:child_process'
+import { dictationAvailable } from './dictation/transcribe.ts'
 import { mkdirSync } from 'node:fs'
 import type { Health } from '@ant/shared'
 import { startHttp } from './api/http.ts'
@@ -68,6 +69,7 @@ function health(): Health {
     claude: { found: !!version, version, loggedIn, authMethod, plan },
     sandbox: { ok: missing.length === 0, missing },
     computer: { chromium: ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome'].some(which) },
+    dictation: dictationAvailable(),
     antHome: cfg.antHome,
     version: cfg.version,
   }

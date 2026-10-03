@@ -27,6 +27,8 @@ export interface Health {
   claude: { found: boolean; version?: string; loggedIn: boolean; authMethod?: string; plan?: string }
   sandbox: { ok: boolean; missing: string[] }
   computer: { chromium: boolean }
+  /** Local speech-to-text for the composer mic (voxtype + ffmpeg). */
+  dictation?: { available: boolean; missing: string[] }
   antHome: string
   version: string
 }

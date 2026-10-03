@@ -7,7 +7,8 @@
   import Camera from '@lucide/svelte/icons/camera'
   import Sparkles from '@lucide/svelte/icons/sparkles'
   import Plug from '@lucide/svelte/icons/plug'
-  import { tick } from 'svelte'
+  import { onDestroy, tick } from 'svelte'
+  import { Recorder, transcribe } from '../../lib/dictation'
   import Ant from '../../lib/ant/Ant.svelte'
   import { connectors, skills as mockSkills } from '../../lib/mock/data'
   import { pop, popOut } from '../../lib/motion'
@@ -22,7 +23,12 @@
   let caret = $state(0)
   let active = $state(0)
   let dismissed = $state('')
-  let listening = $state(false)
+  // Dictation: off → listening (live partial transcripts) → transcribing (final pass) → off.
+  let dictation = $state<'off' | 'starting' | 'listening' | 'transcribing'>('off')
+  const listening = $derived(dictation === 'listening' || dictation === 'starting')
+  let bars: number[] = $state(Array(22).fill(0))
+  let level = $state(0)
+  let elapsed = $state(0)
   let menu: { x: number; y: number; items: MenuItem[] } | null = $state(null)
 
   const value = $derived(app.drafts[thread.id] ?? '')
@@ -138,11 +144,17 @@
 
   function submit() {
     if (!canSend) return
+    // Sending mid-dictation sends what's there and drops the rest of the recording.
+    if (rec) {
+      stopLoops()
+      rec.cancel()
+      rec = null
+      dictation = 'off'
+    }
     const ready = attachments.filter((a) => a.state === 'ready' && a.path)
     const note = ready.length ? `\n\n[Attached: ${ready.map((a) => a.path).join(', ')}]` : ''
     send((value.trim() || 'See the attached files.') + note)
     attachments = []
-    listening = false
   }
 
   function key(e: KeyboardEvent) {
@@ -162,6 +174,13 @@
         dismissed = `${trigger!.ch}${trigger!.start}`
         return
       }
+    }
+    if (dictation === 'listening' && (e.key === 'Escape' || e.key === 'Enter')) {
+      // Enter finishes dictation (review before sending); Esc throws it away.
+      e.preventDefault()
+      if (e.key === 'Escape') cancelDictation()
+      else void finishDictation()
+      return
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault()
@@ -189,21 +208,112 @@
     placeCaret(ch === '/' ? 1 : v.length)
   }
 
-  function toggleMic() {
-    listening = !listening
-    if (!listening) return
-    // Fake dictation: type a phrase in after a beat.
-    const phrase = 'Can you check the staging site for the checkout bug?'
-    let i = 0
-    const id = setInterval(() => {
-      if (!listening || i >= phrase.length) {
-        clearInterval(id)
-        listening = false
-        return
-      }
-      set(value + phrase[i++])
-    }, 28)
+  let rec: Recorder | null = null
+  let around = { before: '', after: '' }
+  let partial: Promise<void> | null = null
+  let frame = 0
+  let partialTimer = 0
+  let startedAt = 0
+  const MAX_MS = 3 * 60_000
+
+  function place(text: string) {
+    const { before, after } = around
+    const lead = before && text && !/\s$/.test(before) ? ' ' : ''
+    const tail = after && text && !/^\s/.test(after) ? ' ' : ''
+    set(before + lead + text + tail + after)
+    return (before + lead + text).length
   }
+
+  async function toggleMic() {
+    if (dictation === 'listening') return finishDictation()
+    if (dictation !== 'off') return
+    if (app.mode !== 'live') return notify('Dictation needs antd running.')
+    const d = app.health?.dictation
+    if (d && !d.available) return notify(`Dictation needs ${d.missing.join(' and ')} installed on this computer.`, 'warn')
+    dictation = 'starting'
+    try {
+      rec = await Recorder.start()
+    } catch (err) {
+      dictation = 'off'
+      return notify(err instanceof Error ? err.message : String(err), 'warn')
+    }
+    const at = ta?.selectionStart ?? value.length
+    around = { before: value.slice(0, at), after: value.slice(at) }
+    dictation = 'listening'
+    startedAt = performance.now()
+    elapsed = 0
+    let last = 0
+    const loop = (t: number) => {
+      if (!rec || dictation !== 'listening') return
+      level = rec.level()
+      if (t - last > 70) {
+        last = t
+        bars = [...bars.slice(1), level]
+        elapsed = Math.floor((t - startedAt) / 1000)
+        if (t - startedAt > MAX_MS) void finishDictation()
+      }
+      frame = requestAnimationFrame(loop)
+    }
+    frame = requestAnimationFrame(loop)
+    // Live preview: re-transcribe what's been said so far every couple of seconds.
+    partialTimer = window.setInterval(() => {
+      if (!rec?.heard || partial) return
+      const r = rec
+      partial = transcribe(r.sofar())
+        .then((text) => {
+          if (rec === r && dictation === 'listening' && text) place(text)
+        })
+        .catch(() => {})
+        .finally(() => (partial = null))
+    }, 2200)
+  }
+
+  function stopLoops() {
+    cancelAnimationFrame(frame)
+    clearInterval(partialTimer)
+    bars = bars.map(() => 0)
+    level = 0
+  }
+
+  async function finishDictation() {
+    const r = rec
+    if (!r || dictation !== 'listening') return
+    stopLoops()
+    dictation = 'transcribing'
+    try {
+      const audio = await r.stop()
+      const text = r.heard ? await transcribe(audio) : ''
+      if (rec !== r) return
+      if (!text) {
+        set(around.before + around.after)
+        if (!r.heard) notify('Didn’t catch anything. Check your microphone.')
+      } else placeCaret(place(text))
+    } catch (err) {
+      notify(err instanceof Error ? err.message : String(err), 'warn')
+    } finally {
+      if (rec === r) {
+        rec = null
+        dictation = 'off'
+      }
+    }
+  }
+
+  function cancelDictation() {
+    if (!rec) return
+    stopLoops()
+    rec.cancel()
+    rec = null
+    set(around.before + around.after)
+    dictation = 'off'
+  }
+
+  onDestroy(() => {
+    stopLoops()
+    rec?.cancel()
+    rec = null
+  })
+
+  const clock = $derived(`${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`)
 </script>
 
 <div class="wrap" class:hero>
@@ -271,13 +381,28 @@
 
     <div class="bar">
       <button class="round ghost" aria-label="Add" onclick={openAttach}><Plus size={18} /></button>
-      {#if listening}
-        <div class="wave" in:pop out:popOut aria-label="Listening">
-          {#each Array(14) as _, i}<i style:--i={i}></i>{/each}
+      {#if dictation === 'listening'}
+        <div class="dictating" in:pop out:popOut>
+          <div class="wave" aria-hidden="true">
+            {#each bars as v, i (i)}<i style:transform="scaleY({0.12 + v * 0.88})"></i>{/each}
+          </div>
+          <span class="clock tabular" aria-live="off">{clock}</span>
+          <span class="hint">Enter to finish · Esc to discard</span>
         </div>
+      {:else if dictation === 'transcribing'}
+        <div class="dictating" in:pop out:popOut role="status"><span class="spin"></span><span class="hint">Transcribing…</span></div>
       {/if}
       <div class="right">
-        <button class="round ghost" class:on={listening} aria-label="Dictate" aria-pressed={listening} onclick={toggleMic}>
+        <button
+          class="round ghost mic"
+          class:on={listening}
+          aria-label={listening ? 'Finish dictation' : 'Dictate'}
+          title={listening ? 'Finish dictation (Enter)' : 'Dictate (transcribed on this computer)'}
+          aria-pressed={listening}
+          disabled={dictation === 'transcribing' || dictation === 'starting'}
+          onclick={toggleMic}
+        >
+          {#if listening}<span class="ring" style:transform="scale({1 + level * 0.55})"></span>{/if}
           <Mic size={17} />
         </button>
         <div class="morph">
@@ -501,11 +626,20 @@
     color: #141413;
   }
 
+  .dictating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
   .wave {
     display: flex;
     align-items: center;
-    gap: 3px;
-    height: 20px;
+    gap: 2px;
+    height: 22px;
   }
 
   .wave i {
@@ -513,7 +647,33 @@
     height: 100%;
     border-radius: 2px;
     background: var(--accent);
-    animation: wave 0.9s calc(var(--i) * -0.13s) ease-in-out infinite;
+    transition: transform 90ms linear;
+  }
+
+  .clock {
+    color: var(--text-soft);
+  }
+
+  .hint {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .mic {
+    position: relative;
+  }
+
+  .mic :global(svg) {
+    position: relative;
+  }
+
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    transition: transform 90ms linear;
   }
 
   .foot {
@@ -593,13 +753,4 @@
     text-overflow: ellipsis;
   }
 
-  @keyframes wave {
-    0%,
-    100% {
-      transform: scaleY(0.25);
-    }
-    50% {
-      transform: scaleY(1);
-    }
-  }
 </style>
