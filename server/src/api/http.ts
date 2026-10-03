@@ -17,6 +17,7 @@ import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
 import { activity } from '../activity.ts'
+import { MemoryStore } from '../memory/store.ts'
 import { Auth, LOCAL_HOSTS, SESSION_COOKIE, hostOf } from '../auth/auth.ts'
 import { remoteStatus, setTailscale } from '../auth/remote.ts'
 import { deleteCookie, setCookie } from 'hono/cookie'
@@ -254,6 +255,15 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     // A fresh process gets the new environment variable.
     svc.refreshIdle()
     svc.enqueue(antId, { threadId: m.threadId, text: `[${svc.userName}] I saved ${p.name} for you. It's in your environment as $${p.name}. Carry on.`, source: 'user', depth: 0, enqueuedAt: Date.now() })
+    return c.body(null, 204)
+  })
+
+  // 👍/👎 on an ant's reply (kept on the message; 👎 feedback itself is sent as a chat message).
+  app.post('/api/messages/:id/rating', async (c) => {
+    const b = await body(c, z.object({ rating: z.enum(['up', 'down']).nullable() }))
+    const m = R.getMessage(svc.db, c.req.param('id'))
+    if (!m || m.kind !== 'text' || m.author === 'user') throw new HttpError(404, 'No such reply')
+    svc.patch(m.id, { rating: b.rating })
     return c.body(null, 204)
   })
 
@@ -658,6 +668,24 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   })
 
   app.get('/api/activity', (c) => c.json(activity(svc)))
+
+  // Memory (Details → Memory): the ant's own notes and the shared profile of the user, entry by
+  // entry, through the same store (limits and injection screening) the ant's memory tool uses.
+  const memStore = (antId: string) => new MemoryStore({ memoryPath: svc.pathsFor(antId).memory, userPath: join(svc.cfg.antHome, 'USER.md') })
+  app.get('/api/ants/:id/memory', (c) => {
+    const st = memStore(svc.antRow(c.req.param('id')).id)
+    return c.json({ memory: st.read('memory'), user: st.read('user'), limits: { memory: 2200, user: 1375 } })
+  })
+  app.post('/api/ants/:id/memory', async (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const b = await body(c, z.object({ target: z.enum(['memory', 'user']), op: z.enum(['add', 'replace', 'remove']), text: z.string().max(2200).default(''), old: z.string().max(2200).optional() }))
+    const st = memStore(id)
+    const r = b.op === 'add' ? st.add(b.target, b.text) : b.op === 'replace' ? st.replace(b.target, b.old ?? '', b.text) : st.remove(b.target, b.old ?? '')
+    if (!r.ok) throw new HttpError(400, r.error)
+    // Memory is snapshotted into each session's instructions; USER.md is shared by every ant.
+    svc.refreshIdle()
+    return c.json({ memory: st.read('memory'), user: st.read('user') })
+  })
 
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)

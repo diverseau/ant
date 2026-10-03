@@ -51,6 +51,8 @@ interface Base {
 }
 
 export interface TextMessage extends Base {
+  /** Your 👍/👎 on an ant's reply. */
+  rating?: 'up' | 'down' | null
   kind: 'text'
   text: string
   streaming?: boolean

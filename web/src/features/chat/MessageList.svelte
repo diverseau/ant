@@ -6,11 +6,13 @@
   import ThumbsDown from '@lucide/svelte/icons/thumbs-down'
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw'
   import Check from '@lucide/svelte/icons/check'
+  import Reply from '@lucide/svelte/icons/reply'
+  import Pencil from '@lucide/svelte/icons/pencil'
   import { tick } from 'svelte'
   import Ant from '../../lib/ant/Ant.svelte'
   import { clock } from '../../lib/format'
   import { pop, popOut, rise } from '../../lib/motion'
-  import { antById, app, loadOlder } from '../../lib/store.svelte'
+  import { antById, app, loadOlder, rate, send } from '../../lib/store.svelte'
   import type { Message, Thread, ToolMessage } from '../../lib/types'
   import RichText from './RichText.svelte'
   import ApprovalCard from './cards/ApprovalCard.svelte'
@@ -114,6 +116,41 @@
     if (scroller) toBottom(false)
   })
 
+  // 👎 asks what was wrong; the answer goes to the ant as a normal message.
+  let feedbackFor = $state<string | null>(null)
+  let feedback = $state('')
+
+  function quote(m: Message) {
+    if (m.kind !== 'text') return
+    app.replyTo[thread.id] = { id: m.id, author: m.author, text: m.text }
+    focusComposer()
+  }
+
+  function editResend(m: Message) {
+    if (m.kind !== 'text') return
+    app.drafts[thread.id] = splitAttached(m.text)?.text ?? m.text
+    focusComposer()
+  }
+
+  function focusComposer() {
+    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('[data-composer]')?.focus())
+  }
+
+  function thumbs(m: Message, r: 'up' | 'down') {
+    if (m.kind !== 'text') return
+    const next = m.rating === r ? null : r
+    rate(thread.id, m.id, next)
+    feedbackFor = next === 'down' ? m.id : null
+    feedback = ''
+  }
+
+  function sendFeedback() {
+    const t = feedback.trim()
+    if (t) send(`That last answer wasn't right: ${t}`)
+    feedbackFor = null
+    feedback = ''
+  }
+
   function copy(m: Message) {
     if (m.kind !== 'text') return
     navigator.clipboard?.writeText(m.text)
@@ -121,6 +158,21 @@
     setTimeout(() => (copied = null), 1400)
   }
 </script>
+
+{#snippet replyTools(m: Message, isLast: boolean)}
+  {#if m.kind === 'text'}
+    <button class="icon-btn sm" aria-label="Copy" title="Copy" onclick={() => copy(m)}>
+      {#if copied === m.id}<span in:pop><Check size={14} /></span>{:else}<Copy size={14} />{/if}
+    </button>
+    <button class="icon-btn sm" aria-label="Reply" title="Reply" onclick={() => quote(m)}><Reply size={14} /></button>
+    <button class="icon-btn sm" class:rated={m.rating === 'up'} aria-pressed={m.rating === 'up'} aria-label="Good response" onclick={() => thumbs(m, 'up')}><ThumbsUp size={14} /></button>
+    <button class="icon-btn sm" class:rated={m.rating === 'down'} aria-pressed={m.rating === 'down'} aria-label="Bad response" onclick={() => thumbs(m, 'down')}><ThumbsDown size={14} /></button>
+    {#if isLast && !app.typing[thread.id]}
+      <button class="icon-btn sm" aria-label="Retry" title="Try again" onclick={() => send('Try that again, with a different approach.')}><RotateCcw size={14} /></button>
+    {/if}
+    <span class="time tabular">{clock(m.at)}</span>
+  {/if}
+{/snippet}
 
 <div class="scroller" bind:this={scroller} onscroll={onScroll}>
   <div class="column">
@@ -163,26 +215,26 @@
                     </div>
                   {/if}
                   {#if m.author !== 'user' && !m.streaming && m !== last}
-                    <div class="hoverbar">
-                      <button class="icon-btn sm" aria-label="Copy" onclick={() => copy(m)}>
+                    <div class="hoverbar">{@render replyTools(m, false)}</div>
+                  {:else if m.author === 'user'}
+                    <div class="hoverbar mine">
+                      <button class="icon-btn sm" aria-label="Copy" title="Copy" onclick={() => copy(m)}>
                         {#if copied === m.id}<span in:pop><Check size={14} /></span>{:else}<Copy size={14} />{/if}
                       </button>
-                      <button class="icon-btn sm" aria-label="Good response"><ThumbsUp size={14} /></button>
-                      <button class="icon-btn sm" aria-label="Bad response"><ThumbsDown size={14} /></button>
+                      <button class="icon-btn sm" aria-label="Edit and resend" title="Edit and resend" onclick={() => editResend(m)}><Pencil size={14} /></button>
                       <span class="time tabular">{clock(m.at)}</span>
                     </div>
                   {/if}
                 </div>
                 {#if m.author !== 'user' && !m.streaming && m === last}
-                  <div class="actions">
-                    <button class="icon-btn sm" aria-label="Copy" onclick={() => copy(m)}>
-                      {#if copied === m.id}<span in:pop><Check size={14} /></span>{:else}<Copy size={14} />{/if}
-                    </button>
-                    <button class="icon-btn sm" aria-label="Good response"><ThumbsUp size={14} /></button>
-                    <button class="icon-btn sm" aria-label="Bad response"><ThumbsDown size={14} /></button>
-                    <button class="icon-btn sm" aria-label="Retry"><RotateCcw size={14} /></button>
-                    <span class="time tabular">{clock(m.at)}</span>
-                  </div>
+                  <div class="actions">{@render replyTools(m, true)}</div>
+                {/if}
+                {#if feedbackFor === m.id}
+                  <form class="feedback" in:rise={{ y: 4, duration: 200 }} onsubmit={(e) => (e.preventDefault(), sendFeedback())}>
+                    <input bind:value={feedback} placeholder="What was wrong? (sent to {antById(m.author)?.name ?? 'the ant'})" maxlength="1000" />
+                    <button class="btn btn-ghost" type="button" onclick={() => (feedbackFor = null)}>Skip</button>
+                    <button class="btn btn-accent" disabled={!feedback.trim()}>Send</button>
+                  </form>
                 {/if}
               {:else if m.kind === 'computer'}
                 <ComputerCard {m} />
@@ -513,5 +565,32 @@
     50% {
       opacity: 0.3;
     }
+  }
+
+  .hoverbar.mine {
+    right: auto;
+    left: 10px;
+  }
+
+  .icon-btn.rated {
+    color: var(--accent);
+  }
+
+  .feedback {
+    display: flex;
+    gap: 6px;
+    width: min(480px, 100%);
+    margin-top: 6px;
+  }
+
+  .feedback input {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-input);
+    font-size: var(--text-sm);
   }
 </style>

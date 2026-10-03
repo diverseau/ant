@@ -9,7 +9,7 @@ export type Inline =
   | { t: 'mention'; ant: Ant }
   | { t: 'tag'; v: string }
 
-export type Block = { t: 'p'; inl: Inline[] } | { t: 'ul'; items: Inline[][] }
+export type Block = { t: 'p'; inl: Inline[] } | { t: 'ul'; items: Inline[][] } | { t: 'quote'; inl: Inline[] }
 
 // A /skill tag only counts at the very start of a message (how skills are invoked).
 const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|@([A-Za-z][\w-]*)|(^)(\/[\w-]+)(?=\s|$)/g
@@ -37,6 +37,10 @@ export function parse(src: string, ants: Ant[]): Block[] {
   const blocks: Block[] = []
   for (const chunk of src.split(/\n{2,}/)) {
     const lines = chunk.split('\n')
+    if (lines.every((l) => /^>\s?/.test(l))) {
+      blocks.push({ t: 'quote', inl: inline(lines.map((l) => l.replace(/^>\s?/, '')).join('\n'), ants) })
+      continue
+    }
     if (lines.every((l) => /^\s*[-•]\s+/.test(l) || !l.trim())) {
       blocks.push({ t: 'ul', items: lines.filter((l) => l.trim()).map((l) => inline(l.replace(/^\s*[-•]\s+/, ''), ants)) })
     } else {

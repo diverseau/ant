@@ -18,6 +18,8 @@
   {#each blocks as b, bi}
     {#if b.t === 'p'}
       <p>{@render inl(b.inl, bi === blocks.length - 1)}</p>
+    {:else if b.t === 'quote'}
+      <blockquote>{@render inl(b.inl, false)}</blockquote>
     {:else}
       <ul>
         {#each b.items as item, ii}
@@ -38,6 +40,15 @@
     overflow-wrap: anywhere;
   }
 
+  blockquote {
+    margin: 0;
+    padding: 2px 0 2px 10px;
+    border-left: 2px solid var(--border-strong);
+    font-size: 0.9em;
+    color: var(--text-muted);
+  }
+
+  blockquote + p,
   p + p,
   p + ul,
   ul + p {

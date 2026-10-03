@@ -46,6 +46,10 @@ export interface RemoteView {
 
 export const api = {
   answerSecret: (messageId: string, value: string | null) => req<void>('POST', `/api/messages/${messageId}/secret`, value === null ? { decline: true } : { value }),
+  memory: (antId: string) => req<{ memory: string[]; user: string[]; limits: { memory: number; user: number } }>('GET', `/api/ants/${antId}/memory`),
+  editMemory: (antId: string, b: { target: 'memory' | 'user'; op: 'add' | 'replace' | 'remove'; text: string; old?: string }) =>
+    req<{ memory: string[]; user: string[] }>('POST', `/api/ants/${antId}/memory`, b),
+  rate: (messageId: string, rating: 'up' | 'down' | null) => req<void>('POST', `/api/messages/${messageId}/rating`, { rating }),
   activity: () => req<ActivityView>('GET', '/api/activity'),
   authStatus: () => req<{ trusted: boolean; authenticated: boolean; device: { id: string; name: string } | null }>('GET', '/api/auth/status'),
   pair: (code: string, name: string) => req<{ device: { id: string; name: string } }>('POST', '/api/auth/pair', { code, name }),

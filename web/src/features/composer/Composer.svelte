@@ -2,6 +2,7 @@
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
   import Mic from '@lucide/svelte/icons/mic'
   import Plus from '@lucide/svelte/icons/plus'
+  import Reply from '@lucide/svelte/icons/reply'
   import Square from '@lucide/svelte/icons/square'
   import Paperclip from '@lucide/svelte/icons/paperclip'
   import Camera from '@lucide/svelte/icons/camera'
@@ -153,7 +154,11 @@
     }
     const ready = attachments.filter((a) => a.state === 'ready' && a.path)
     const note = ready.length ? `\n\n[Attached: ${ready.map((a) => a.path).join(', ')}]` : ''
-    send((value.trim() || 'See the attached files.') + note)
+    // Replying quotes the start of the message, so the ant knows what "this" refers to.
+    const r = app.replyTo[thread.id]
+    const quote = r ? `> ${r.text.replace(/\n\[Attached:[^\]]*\]$/, '').trim().slice(0, 400).replace(/\n/g, '\n> ')}${r.text.length > 400 ? '…' : ''}\n\n` : ''
+    delete app.replyTo[thread.id]
+    send(quote + (value.trim() || 'See the attached files.') + note)
     attachments = []
   }
 
@@ -352,6 +357,14 @@
     ondrop={(e) => { e.preventDefault(); dragging = false; addFiles(e.dataTransfer?.files ?? null) }}
     onpaste={(e) => { if (e.clipboardData?.files.length) { e.preventDefault(); addFiles(e.clipboardData.files) } }}
   >
+    {#if app.replyTo[thread.id]}
+      {@const r = app.replyTo[thread.id]}
+      <div class="replying" in:pop out:popOut>
+        <Reply size={13} />
+        <span class="rtext">Replying to {r.author === 'user' ? 'yourself' : (app.ants.find((a) => a.id === r.author)?.name ?? 'ant')}: {r.text.replace(/\s+/g, ' ').slice(0, 120)}</span>
+        <button aria-label="Cancel reply" onclick={() => delete app.replyTo[thread.id]}>×</button>
+      </div>
+    {/if}
     {#if attachments.length}
       <div class="chips">
         {#each attachments as a (a.id)}
@@ -753,6 +766,39 @@
     text-overflow: ellipsis;
   }
 
+
+    .replying {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 12px 0;
+    padding: 6px 6px 6px 10px;
+    border-radius: var(--r-md);
+    border-left: 2px solid var(--accent);
+    background: var(--bg-active);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .rtext {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .replying button {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: var(--text-muted);
+  }
+
+  .replying button:hover {
+    background: var(--bg-selected);
+    color: var(--text);
+  }
 
   /* Phones: 16px stops iOS zooming into the field; the long hints don't fit. */
   @media (max-width: 720px) {

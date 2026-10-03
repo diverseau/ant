@@ -20,6 +20,8 @@ export const app = $state({
   mode: 'connecting' as Mode,
   /** Phone layout: the chat screen is showing (otherwise the ant list). */
   mobileChat: false,
+  /** A message being replied to, per thread (quoted into the next message). */
+  replyTo: {} as Record<string, { id: string; author: string; text: string }>,
   online: true,
   user: { name: 'Leon', plan: 'Pro' },
   ants: [] as Ant[],
@@ -697,4 +699,11 @@ export async function answerSecret(messageId: string, value: string | null) {
     const m = t.messages.find((x) => x.id === messageId)
     if (m && m.kind === 'secret') m.state = value === null ? 'declined' : 'saved'
   }
+}
+
+/** 👍/👎 on an ant's reply. */
+export function rate(threadId: string, messageId: string, rating: 'up' | 'down' | null) {
+  const m = threadById(threadId)?.messages.find((x) => x.id === messageId)
+  if (m?.kind === 'text') m.rating = rating
+  if (live()) api.rate(messageId, rating).catch(fail)
 }

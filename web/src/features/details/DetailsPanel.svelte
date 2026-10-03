@@ -24,6 +24,7 @@
   import RoutineEditor from '../routines/RoutineEditor.svelte'
   import RuleForm from './RuleForm.svelte'
   import SkillEditor from './SkillEditor.svelte'
+  import MemorySection from './MemorySection.svelte'
   import RoutineRuns from '../routines/RoutineRuns.svelte'
 
   const thread = $derived(threadById(app.selectedId))
@@ -269,6 +270,8 @@
         <button class="btn btn-ghost new-routine" disabled={app.mode !== 'live'} onclick={() => editor = { antId: ant.id }}><Plus size={13} /> New routine</button>
       {/if}
     </section>
+
+    {#if app.mode === 'live'}<MemorySection antId={ant.id} antName={ant.name} />{/if}
 
     <section>
       <h3><ShieldCheck size={13} /> Rules</h3>
