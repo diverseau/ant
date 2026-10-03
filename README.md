@@ -35,6 +35,10 @@ For an always-on server, see [docs/self-hosting.md](docs/self-hosting.md).
 - **Chat apps**: talk to your ants from Telegram, Discord or Slack (allow-listed users only).
 - **Dictation**: speak into the composer; speech is transcribed on your computer (voxtype).
 
+## On your phone
+
+Settings → Devices → Remote access turns on Tailscale (`https://<machine>.<tailnet>.ts.net:8443`, your tailnet only). Open that on your phone, pair it with the code or QR shown under **Pair a device**, then add Ant to your Home Screen and turn on notifications. Every device except this computer pairs once and can be removed any time.
+
 ## Safety model
 
 Every ant is fenced in by four layers:

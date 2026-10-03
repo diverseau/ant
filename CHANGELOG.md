@@ -12,6 +12,11 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Full-screen view of an ant's computer (expand button or double-click): watch without taking over, take over from there if you want, Esc to leave.
 - Real logos for connectors and chat channels, downloaded once by antd from Google's favicon service and cached in Ant's data folder (letter tile when a site has none).
 - Real dictation in the composer: speech is transcribed on this computer by voxtype (local Whisper) via ffmpeg, with live partial text while you talk, a level-driven waveform, Enter to finish and Esc to discard. Nothing is sent to a cloud service.
+- Device pairing: every device except the computer antd runs on pairs once with a one-time code (Settings → Devices, QR code, or `npm run pair`) and gets its own revocable session.
+- Remote access over Tailscale (`tailscale serve` on port 8443, tailnet only) from Settings → Devices.
+- Phone layout: list and chat as sliding screens with swipe-back, full-width panels, bottom-sheet dialogs.
+- Installable web app and push notifications (approvals, hand-offs, and replies when no Ant window is open).
+- Docker image verified on Docker 29.
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security

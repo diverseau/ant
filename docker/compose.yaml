@@ -21,8 +21,8 @@ services:
       - ant-data:/home/ant/.local/share/ant
       - ant-claude:/home/ant/.claude
     ports:
-      # Use an SSH tunnel (optionally over Tailscale) for remote access.
-      # Never bind 0.0.0.0 on the host without an authentication layer.
+      # Other devices pair with a one-time code (see docs/self-hosting.md).
+      # Put https in front before exposing this beyond the host.
       - "127.0.0.1:7420:7420"
     shm_size: 1gb
     init: true

@@ -20,8 +20,15 @@ open the login URL in your own browser and complete the CLI's prompts. Do not pu
 tokens, API keys, or your host's Claude files into the image or Compose
 environment. Login happens inside the container, using the official CLI.
 
-Open <http://127.0.0.1:7420> on the Docker host, or use the SSH tunnel below. Check
-the installation with:
+Open <http://127.0.0.1:7420> on the Docker host. Requests reach antd through
+Docker's network, not loopback, so the browser asks you to pair it once: the code
+is in the logs on first start, or make a new one any time with
+
+```sh
+docker compose -f docker/compose.yaml exec ant node server/src/cli/pair.ts
+```
+
+Check the installation with:
 
 ```sh
 docker compose -f docker/compose.yaml logs --tail=100 ant
@@ -193,23 +200,28 @@ starts a fresh session. Ant's database history and folder memory remain restored
 
 ## Remote access
 
-Keep the default loopback port publication. From your PC, create an SSH tunnel
-to the server:
+Every device except the machine antd runs on must pair once (Settings → Devices →
+Pair a device, or the pair command above). Pairing gives the device its own
+revocable session; codes last 10 minutes and work once. `ANT_REQUIRE_LOGIN=1`
+makes even the local machine pair.
+
+The easiest private route is Tailscale. On the machine running antd natively,
+Settings → Devices → Remote access → Turn on runs
+`tailscale serve --bg --https=8443 http://127.0.0.1:7420`, so Ant is at
+`https://<machine>.<tailnet>.ts.net:8443` for your tailnet only, with a real
+certificate (phones need https for the microphone, installing the app and push
+notifications). For Docker or your own proxy, put https in front of antd and add
+the public host name to `ANT_ALLOWED_HOSTS` (and `ANT_PUBLIC_URL` for pairing
+links and push).
+
+An SSH tunnel also works and needs nothing else:
 
 ```sh
 ssh -N -L 127.0.0.1:7420:127.0.0.1:7420 user@server
 ```
 
-Then open <http://127.0.0.1:7420> locally. You can use the server's Tailscale
-address or hostname for the SSH connection, keeping access on your private
-tailnet. SSH authenticates the connection, and the browser still uses a
-localhost origin, which the current Ant API requires.
-
-Never change the host port to `0.0.0.0:7420:7420` without a separate, correctly
-configured authentication layer. The current HTTP API has no application login
-gate; origin checking is not authentication. Direct Tailscale HTTP access and
-public reverse proxies also need backend origin support, outside this setup's
-scope. Use the SSH tunnel rather than editing or bypassing those checks.
+Don't publish antd's port on a public interface without https in front of it:
+pairing cookies over plain http can be read on the network.
 
 ## Limitations
 
@@ -222,6 +234,7 @@ scope. Use the SSH tunnel rather than editing or bypassing those checks.
   policies can still prevent bubblewrap or Chromium sandbox startup. Verify
   both with a real turn and browser on your server; do not work around failures
   by using privileged mode or disabling the sandbox.
-- This packaging has not been Docker-built or run in the implementation
-  sandbox. Native CLI installation, persistent `/login`, nested sandboxing and
-  Chromium startup must be verified on a Docker host with network access.
+- Verified on Docker 29 (2026-10-03): the image builds, Claude Code installs,
+  the sandbox and Chromium checks pass, ants are created and their browser
+  starts. A full model turn needs `/login` inside the container first.
+- Dictation needs ffmpeg and voxtype, which the image doesn't include.

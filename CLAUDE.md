@@ -11,7 +11,7 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 
 ## Status
 
-`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Release 0.9.0 (see `CHANGELOG.md`) covers the whole v1 plan. Open: full-desktop computer use (needs TigerVNC + cua-driver), verifying the Docker image on a machine with Docker access, live-testing channels with real bot tokens.
+`web/` (Svelte UI) talks to `server/` (antd), which runs each ant as a real `claude -p` session in `~/Ants/<ant>/`. Without antd running the UI falls back to a scripted demo. Release 0.9.0 (see `CHANGELOG.md`) covers the whole v1 plan. Since then (unreleased, see `CHANGELOG.md`): pickers, dictation, device pairing + Tailscale remote access, phone layout, installable app with push. Open items are tracked in `docs/audit-vs-reference.md`; full-desktop computer use still needs TigerVNC + cua-driver, channels need live bot tokens.
 
 ## Commands
 
@@ -20,6 +20,7 @@ From the repo root (npm workspaces):
 - Install: `npm install`
 - antd: `npm run dev:server` (port 7420; ants in `~/Ants`, state in `~/.local/share/ant`)
 - Web: `npm run dev:web` (Vite proxies `/api` and `/ws` to antd)
+- Pair a phone or another computer (prints a one-time code): `npm run pair`
 - Type check everything: `npm run check`
 - Tests (no model calls; fake `claude`): `npm test`
 - Real end-to-end (spends a little usage, Haiku): `server/e2e/run.sh [chat|browser|all]`
