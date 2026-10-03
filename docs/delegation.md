@@ -36,7 +36,7 @@ The rule of thumb: if getting it subtly wrong could leak data, act on your machi
 <one paragraph: what and why>
 ## Context
 <links: plan section, existing patterns to copy, Hermes files to port by ABSOLUTE path
-(/home/diverse/Projects/Ant/reference/hermes-agent/…, it's gitignored so not in the worktree)>
+(<main checkout>/reference/hermes-agent/…, it's gitignored so not in the worktree)>
 ## In scope (create/modify only these)
 - path/…
 ## Out of scope (do not touch)

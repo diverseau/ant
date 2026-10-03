@@ -7,7 +7,7 @@ Ant is a Claude-flavoured take on Grok Bot and ChatGPT Dots: persistent, named a
 - Backend plan (Claude Code CLI runtime, ant folders, safety, colonies, computer): `docs/plan-backend-v1.md`
 - Hermes Agent reference clone (MIT, read-only, gitignored, never run it): `reference/hermes-agent`
 - Delegation to Codex (gpt-6.1-sol, high) for bulk work, and what stays with Claude: `docs/delegation.md`. Run tasks with `scripts/codex-task.sh`.
-- Visual references (sample colours from these, don't guess): `docs/refs/`
+- Visual references (sample colours from these, don't guess): `docs/refs/` (local only, gitignored: they're screenshots of other products and accounts)
 
 ## Status
 
@@ -42,7 +42,7 @@ From the repo root (npm workspaces):
 
 ## Design rules
 
-- Dark only. Colours come from the `brand-guidelines` skill plus values sampled from `docs/refs/`; load that skill before UI work.
+- Dark only. Colours come from the `brand-guidelines` skill plus values sampled from `docs/refs/` (local only); load that skill before UI work.
 - Fonts: Poppins for UI, labels and headings; Lora for message text, descriptions and display text.
 - Layout and mechanics follow Grok Bot (agent list sidebar, per-ant chat, computer panel, approvals). Colours, spacing and softness follow claude.ai.
 - Looks beat bytes, but motion must stay at 60 fps. Animate `transform` and `opacity` only, and respect `prefers-reduced-motion`.

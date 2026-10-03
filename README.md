@@ -4,6 +4,8 @@ Persistent Claude agents ("ants") that live on your computer, each with its own 
 
 Ant runs the official **Claude Code** CLI under your own Claude subscription. Nothing is proxied or resold; ants are `claude` sessions in folders on your machine.
 
+> Ant is an independent open-source project. It is not affiliated with, endorsed by or sponsored by Anthropic, xAI or OpenAI. "Claude" and "Anthropic" are trademarks of Anthropic, PBC.
+
 ## Quick start
 
 Requirements: Linux, Node 26+, [Claude Code](https://code.claude.com) signed in (`claude`, then `/login`), `bubblewrap` and `socat` for the sandbox, and Chromium for the ants' browser. Optional: `ffmpeg` and `voxtype` for the composer's mic (speech is transcribed locally).
@@ -79,3 +81,11 @@ server/e2e/run.sh all                # real end-to-end with Haiku (spends a litt
 ```
 
 Contributor notes for agents: [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md), [docs/delegation.md](docs/delegation.md).
+
+## Security
+
+Ant gives AI agents real access to your computer, inside the limits described above. Report vulnerabilities privately: see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE). Parts are ported from [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

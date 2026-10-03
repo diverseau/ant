@@ -31,3 +31,6 @@ reference/
 
 # Codex delegation worktrees and logs
 .worktrees/
+
+# Reference screenshots of other products and personal accounts: local only.
+docs/refs/
