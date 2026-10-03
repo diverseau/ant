@@ -76,7 +76,7 @@ export class ChannelHub {
     }
     try {
       const adapter = await this.factory(cfg.kind, token)
-      const { botName } = await adapter.start({ onMessage: (m) => void this.inbound(m), log: (msg) => console.log(`[${cfg.kind}] ${msg}`) })
+      const { botName } = await adapter.start({ onMessage: (m) => void this.inbound(m), onEvent: (e) => this.svc.bus.emit('channel.event', e), log: (msg) => console.log(`[${cfg.kind}] ${msg}`) })
       this.adapters.set(cfg.kind, adapter)
       this.status.set(cfg.kind, { ...base, connected: true, botName })
     } catch (err) {

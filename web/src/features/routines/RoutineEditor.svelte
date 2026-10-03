@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import type { RoutineView } from '@ant/shared'
+  import type { EventSpec, GitHubEvent, RoutineView } from '@ant/shared'
+  import Logo from '../../lib/ui/Logo.svelte'
   import Copy from '@lucide/svelte/icons/copy'
+  import Globe from '@lucide/svelte/icons/globe'
   import X from '@lucide/svelte/icons/x'
   import { app, createRoutine, updateRoutine } from '../../lib/store.svelte'
   import { collapse, rise } from '../../lib/motion'
@@ -13,7 +15,36 @@
   const initial = untrack(() => routine)
   let name = $state(initial?.name ?? '')
   let instruction = $state(initial?.instruction ?? '')
-  let trigger = $state<'schedule' | 'webhook'>(initial?.trigger ?? 'schedule')
+  // What starts it: a schedule, an event (GitHub, Slack, a web page changing) or a webhook.
+  let trigger = $state<'schedule' | 'event' | 'webhook'>(initial?.trigger === 'watch' ? 'event' : (initial?.trigger ?? 'schedule'))
+  const ev = initial?.event
+  let source = $state<EventSpec['source']>(ev?.source ?? 'github')
+  let repo = $state(ev?.source === 'github' ? ev.repo : '')
+  let ghEvents = $state<GitHubEvent[]>(ev?.source === 'github' ? ev.events : ['issue.opened', 'pr.opened'])
+  let slackOn = $state<'mention' | 'message' | 'phrase' | 'reaction'>(ev?.source === 'slack' ? ev.on : 'mention')
+  let slackChannel = $state(ev?.source === 'slack' ? (ev.channel ?? '') : '')
+  let phrase = $state(ev?.source === 'slack' ? (ev.phrase ?? '') : '')
+  let emoji = $state(ev?.source === 'slack' ? (ev.emoji ?? '') : '')
+  let url = $state(ev?.source === 'watch' ? ev.url : '')
+  let every = $state(ev?.source === 'watch' ? ev.everyMinutes : 30)
+  let contains = $state(ev?.source === 'watch' ? (ev.contains ?? '') : '')
+  const TRIGGERS = ['schedule', 'event', 'webhook'] as const
+  const SOURCES = [
+    { id: 'github', label: 'GitHub', domain: 'github.com' },
+    { id: 'slack', label: 'Slack', domain: 'slack.com' },
+    { id: 'watch', label: 'Web page', domain: null },
+  ] as const
+  const GH: Array<[GitHubEvent, string]> = [['issue.opened', 'New issue'], ['pr.opened', 'New pull request'], ['pr.merged', 'PR merged'], ['push', 'Push'], ['comment', 'Comment'], ['release', 'Release']]
+  const spec = $derived<EventSpec>(
+    source === 'github'
+      ? { source, repo: repo.trim(), events: ghEvents }
+      : source === 'slack'
+        ? { source, on: slackOn, channel: slackChannel.trim() || undefined, phrase: phrase.trim() || undefined, emoji: emoji.trim() || undefined }
+        : { source, url: url.trim(), everyMinutes: Number(every) || 30, contains: contains.trim() || undefined },
+  )
+  const eventReady = $derived(
+    source === 'github' ? !!repo.trim() && ghEvents.length > 0 : source === 'slack' ? slackOn !== 'phrase' || !!phrase.trim() : !!url.trim(),
+  )
   let when = $state('')
   let tz = $state(initial?.tz ?? app.timezone)
   let saving = $state(false)
@@ -34,7 +65,7 @@
   })
 
   const examples = ['every weekday at 9am', 'every 2 hours', '0 9 * * 1-5']
-  const canSave = $derived(!!name.trim() && !!instruction.trim() && (trigger === 'webhook' || !!routine || !!when.trim()))
+  const canSave = $derived(!!name.trim() && !!instruction.trim() && (trigger === 'webhook' || (trigger === 'event' ? eventReady : !!routine || !!when.trim())))
   const quote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`
   const curl = $derived(credentials ? `curl -X POST ${quote(credentials.url)} \\\n  -H ${quote(`Authorization: Bearer ${credentials.key}`)} \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'` : '')
 
@@ -52,10 +83,15 @@
         await updateRoutine(routine.id, {
           name: name.trim(), instruction: instruction.trim(), tz: tz.trim() || app.timezone,
           ...(trigger === 'schedule' && when.trim() && { when: when.trim() }),
+          ...(trigger === 'event' && { event: spec }),
         })
         onclose()
       } else {
-        const result = await createRoutine({ antId, name: name.trim(), instruction: instruction.trim(), trigger, when: when.trim(), tz: tz.trim() || app.timezone })
+        const result = await createRoutine({
+          antId, name: name.trim(), instruction: instruction.trim(), when: when.trim(), tz: tz.trim() || app.timezone,
+          trigger: trigger === 'event' ? (source === 'watch' ? 'watch' : 'event') : trigger,
+          ...(trigger === 'event' && { event: spec }),
+        })
         if (result.key && result.routine.webhookUrl) credentials = { url: result.routine.webhookUrl, key: result.key }
         else onclose()
       }
@@ -119,8 +155,9 @@
           </label>
           {#if !routine}
             <div class="seg" role="group" aria-label="Routine trigger">
-              <span class="selection" style:transform="translateX({trigger === 'schedule' ? 0 : 100}%)"></span>
+              <span class="selection" style:transform="translateX({TRIGGERS.indexOf(trigger) * 100}%)"></span>
               <button type="button" aria-pressed={trigger === 'schedule'} onclick={() => { trigger = 'schedule'; error = '' }}>Schedule</button>
+              <button type="button" aria-pressed={trigger === 'event'} onclick={() => { trigger = 'event'; error = '' }}>Event</button>
               <button type="button" aria-pressed={trigger === 'webhook'} onclick={() => { trigger = 'webhook'; error = '' }}>Webhook</button>
             </div>
           {/if}
@@ -136,6 +173,48 @@
                 {#each examples as example}<button type="button" onclick={() => { when = example; error = '' }}>{example}</button>{/each}
               </div>
             </div>
+          {:else if trigger === 'event'}
+            <div class="event" transition:collapse>
+              {#if !routine}
+                <div class="sources" role="radiogroup" aria-label="Event source">
+                  {#each SOURCES as s}
+                    <button type="button" role="radio" aria-checked={source === s.id} class:on={source === s.id} onclick={() => { source = s.id; error = '' }}>
+                      {#if s.domain}<Logo name={s.label} domain={s.domain} size={20} />{:else}<Globe size={17} />{/if} {s.label}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+              {#key source}
+                <div class="fields" in:rise={{ y: 4, duration: 220 }}>
+                  {#if source === 'github'}
+                    <label><span>Repository</span><input bind:value={repo} placeholder="owner/repo" autocapitalize="off" spellcheck="false" /></label>
+                    <div class="chips" role="group" aria-label="GitHub events">
+                      {#each GH as [id, label]}
+                        <button type="button" aria-pressed={ghEvents.includes(id)} onclick={() => (ghEvents = ghEvents.includes(id) ? ghEvents.filter((x) => x !== id) : [...ghEvents, id])}>{label}</button>
+                      {/each}
+                    </div>
+                    <p class="hint">Checked every 2 minutes, no public address needed. Private repos need a <code>GITHUB_TOKEN</code> secret (Connectors → Secrets).</p>
+                  {:else if source === 'slack'}
+                    <div class="chips" role="group" aria-label="Slack event">
+                      {#each [['mention', 'Bot mentioned'], ['message', 'Any message'], ['phrase', 'Message with phrase'], ['reaction', 'Reaction']] as [id, label]}
+                        <button type="button" aria-pressed={slackOn === id} onclick={() => (slackOn = id as typeof slackOn)}>{label}</button>
+                      {/each}
+                    </div>
+                    {#if slackOn === 'phrase'}<label><span>Phrase</span><input bind:value={phrase} placeholder="bug report" /></label>{/if}
+                    {#if slackOn === 'reaction'}<label><span>Emoji (optional)</span><input bind:value={emoji} placeholder=":eyes:" /></label>{/if}
+                    <label><span>Channel (optional)</span><input bind:value={slackChannel} placeholder="#bugs, or leave blank for any" /></label>
+                    <p class="hint">Uses your Slack channel connection (Connectors → Channels). Invite the bot to the channel; anyone in it can trigger this.</p>
+                  {:else}
+                    <label><span>Page</span><input bind:value={url} type="url" placeholder="https://example.com/pricing" /></label>
+                    <div class="row2">
+                      <label><span>Check every (minutes)</span><input bind:value={every} type="number" min="5" max="1440" /></label>
+                      <label><span>Only when it mentions (optional)</span><input bind:value={contains} placeholder="in stock" /></label>
+                    </div>
+                    <p class="hint">Ant checks the page itself and only wakes the ant when the text changes, so quiet checks use none of your Claude usage. Public pages only.</p>
+                  {/if}
+                </div>
+              {/key}
+            </div>
           {:else}
             <p class="description" in:rise>Runs when you send a POST request to its webhook URL.</p>
             {#if routine?.webhookUrl}
@@ -147,13 +226,15 @@
               {#if copyError}<p class="error" role="alert">{copyError}</p>{/if}
             {/if}
           {/if}
-          <label>
-            <span>Time zone</span>
-            <input bind:value={tz} placeholder={app.timezone} aria-invalid={!!error && errorField === 'tz'} />
-            {#if error && errorField === 'tz'}<span class="error" role="alert">{error}</span>{/if}
-          </label>
+          {#if trigger === 'schedule'}
+            <label>
+              <span>Time zone</span>
+              <input bind:value={tz} placeholder={app.timezone} aria-invalid={!!error && errorField === 'tz'} />
+              {#if error && errorField === 'tz'}<span class="error" role="alert">{error}</span>{/if}
+            </label>
+          {/if}
         </fieldset>
-        {#if error && (errorField === 'form' || (errorField === 'when' && trigger === 'webhook'))}<p class="error" role="alert">{error}</p>{/if}
+        {#if error && (errorField === 'form' || (errorField === 'when' && trigger !== 'schedule'))}<p class="error" role="alert">{error}</p>{/if}
         <div class="actions">
           <button type="button" class="btn btn-ghost" disabled={saving} onclick={close}>Cancel</button>
           <button type="submit" class="btn btn-accent" disabled={!canSave || saving}>{saving ? 'Saving…' : routine ? 'Save changes' : 'Create routine'}</button>
@@ -235,7 +316,7 @@
   .seg {
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     padding: 3px;
     border-radius: var(--r-md);
     background: var(--bg-input);
@@ -246,7 +327,7 @@
     top: 3px;
     left: 3px;
     height: 32px;
-    width: calc(50% - 3px);
+    width: calc(33.333% - 2px);
     border-radius: var(--r-sm);
     background: var(--bg-selected);
     transition: transform var(--dur-slow) var(--ease-spring);
@@ -345,5 +426,91 @@
 
   button:disabled {
     opacity: 0.5;
+  }
+
+  .event,
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sources {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .sources button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    transition:
+      border-color var(--dur-fast),
+      color var(--dur-fast),
+      background var(--dur-fast),
+      transform var(--dur-fast) var(--ease-out);
+  }
+
+  .sources button:hover {
+    color: var(--text);
+  }
+
+  .sources button.on {
+    border-color: var(--border-focus);
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  .sources button:active {
+    transform: scale(0.97);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chips button {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--border);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    transition:
+      background var(--dur-fast),
+      color var(--dur-fast),
+      border-color var(--dur-fast),
+      transform var(--dur-fast) var(--ease-out);
+  }
+
+  .chips button[aria-pressed='true'] {
+    background: var(--bg-selected);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .chips button:active {
+    transform: scale(0.95);
+  }
+
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 520px) {
+    .row2 {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

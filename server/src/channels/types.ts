@@ -17,8 +17,24 @@ export interface InboundMessage {
   addressed: boolean
 }
 
+/** Something that happened in a channel the bot is in, for event routines (any member). */
+export interface ChannelEvent {
+  channel: ChannelKind
+  kind: 'message' | 'mention' | 'reaction'
+  chatId: string
+  /** Human channel name without '#', when the platform tells us. */
+  chatName?: string
+  userId: string
+  userName: string
+  text: string
+  /** Reactions: the emoji name, e.g. "eyes". */
+  emoji?: string
+}
+
 export interface ChannelContext {
   onMessage: (m: InboundMessage) => void
+  /** Channel activity for event routines; separate from chat with ants. */
+  onEvent?: (e: ChannelEvent) => void
   log: (msg: string) => void
 }
 

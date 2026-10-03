@@ -17,6 +17,7 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Phone layout: list and chat as sliding screens with swipe-back, full-width panels, bottom-sheet dialogs.
 - Installable web app and push notifications (approvals, hand-offs, and replies when no Ant window is open).
 - Docker image verified on Docker 29.
+- Event routines: GitHub (new issues and PRs, merges, pushes, comments, releases; polled, no public URL), Slack (mentions, messages, phrases, reactions in a channel) and page watches (a public page changes or starts mentioning a phrase; checked by Ant without using Claude until it fires). Event data is passed to the ant as untrusted information, with a 30-second cooldown. Ants can create them with `schedule_routine`.
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security

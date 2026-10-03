@@ -15,12 +15,19 @@ export interface SlackMessage {
   edited?: unknown
 }
 
+export interface SlackReaction {
+  user?: string
+  reaction?: string
+  item?: { type?: string; channel?: string; ts?: string }
+}
+
 /** The small Bolt surface used here also lets tests supply an offline app. */
 export interface SlackApp {
   init(): Promise<void>
   start(): Promise<unknown>
   stop(): Promise<unknown>
   event(name: 'message' | 'app_mention', handler: (args: { event: SlackMessage }) => Promise<void>): void
+  event(name: 'reaction_added', handler: (args: { event: SlackReaction }) => Promise<void>): void
   error(handler: (error: unknown) => Promise<void>): void
   client: {
     auth: { test(): Promise<{ user_id?: string; user?: string }> }
@@ -28,6 +35,10 @@ export interface SlackApp {
       info(options: { user: string }): Promise<{
         user?: { is_bot?: boolean; name?: string; real_name?: string; profile?: { display_name?: string; real_name?: string } }
       }>
+    }
+    conversations?: {
+      info(options: { channel: string }): Promise<{ channel?: { name?: string } }>
+      history(options: { channel: string; latest: string; inclusive: true; limit: 1 }): Promise<{ messages?: Array<{ text?: string }> }>
     }
     chat: {
       postMessage(options: {
@@ -58,8 +69,46 @@ export function createAdapter(token: string, deps: { app?: SlackApp } = {}): Cha
   app.event('message', async ({ event }) => {
     // Channel mentions arrive separately as app_mention, so never process them twice.
     if (event.channel_type === 'im') await inbound(event)
+    else if (event.channel_type === 'channel' || event.channel_type === 'group') await channelEvent('message', event)
   })
-  app.event('app_mention', async ({ event }) => { await inbound(event) })
+  app.event('app_mention', async ({ event }) => {
+    await inbound(event)
+    await channelEvent('mention', event)
+  })
+  app.event('reaction_added', async ({ event }) => {
+    const ctx = context
+    if (!ctx?.onEvent || !event.item?.channel || !event.item.ts || !event.user || event.user === botId) return
+    const channel = event.item.channel
+    const text = await app.client.conversations?.history({ channel, latest: event.item.ts, inclusive: true, limit: 1 })
+      .then((r) => r.messages?.[0]?.text ?? '', () => '')
+    ctx.onEvent({
+      channel: 'slack', kind: 'reaction', chatId: channel, chatName: await channelName(channel), userId: event.user,
+      userName: await userName(event.user), text: plain(text ?? ''), emoji: event.reaction,
+    })
+  })
+
+  // Channel activity for event routines (any member of channels the bot is in).
+  const names = new Map<string, string>()
+  async function channelName(id: string): Promise<string | undefined> {
+    if (!names.has(id)) {
+      const name = await app.client.conversations?.info({ channel: id }).then((r) => r.channel?.name, () => undefined)
+      if (name) names.set(id, name)
+    }
+    return names.get(id)
+  }
+  async function userName(id: string): Promise<string> {
+    const u = await app.client.users.info({ user: id }).then((r) => r.user, () => undefined)
+    return u?.profile?.display_name || u?.profile?.real_name || u?.real_name || u?.name || id
+  }
+  const plain = (text: string) => text.replace(/<@([A-Z0-9]+)(?:\|([^>]*))?>/g, (_m, id: string, label?: string) => (id === botId ? '' : `@${label ?? id}`)).replace(/<([^|>]+)\|([^>]+)>/g, '$2').trim()
+  async function channelEvent(kind: 'message' | 'mention', message: SlackMessage) {
+    const ctx = context
+    if (!ctx?.onEvent || !botId || !message.channel || !message.user || message.user === botId || message.bot_id || message.bot_profile || message.edited
+      || (message.subtype && !['file_share', 'thread_broadcast'].includes(message.subtype))) return
+    const text = plain(message.text ?? '')
+    if (!text) return
+    ctx.onEvent({ channel: 'slack', kind, chatId: message.channel, chatName: await channelName(message.channel), userId: message.user, userName: await userName(message.user), text })
+  }
 
   async function inbound(message: SlackMessage) {
     const ctx = context

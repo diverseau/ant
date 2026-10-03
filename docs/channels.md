@@ -44,10 +44,10 @@ features:
     messages_tab_read_only_enabled: false
 oauth_config:
   scopes:
-    bot: [app_mentions:read, chat:write, im:history, im:read, im:write, channels:history, groups:history, users:read]
+    bot: [app_mentions:read, chat:write, im:history, im:read, im:write, channels:history, groups:history, channels:read, groups:read, reactions:read, users:read]
 settings:
   event_subscriptions:
-    bot_events: [app_mention, message.im]
+    bot_events: [app_mention, message.im, message.channels, message.groups, reaction_added]
   socket_mode_enabled: true
 ```
 
@@ -55,3 +55,8 @@ settings:
 3. Basic Information → **App-Level Tokens** → generate one with `connections:write` (`xapp-…`).
 4. Your member id: your Slack profile → ⋯ → **Copy member ID**.
 5. In Ant: Connectors → Channels → Slack: token as `xoxb-…|xapp-…` (bot token, a pipe, app token) and your member id → **Connect**.
+
+### Slack events for routines
+
+Routines can start on Slack activity (Details → New routine → Event → Slack): the bot being mentioned, any message, a message containing a phrase, or a reaction, optionally in one channel. Invite the bot to that channel (`/invite @Ant`). Anyone in the channel can trigger these routines, and what they wrote is passed to the ant as untrusted information. If you created the Slack app before this was added, update its manifest with the scopes and events above and reinstall it.
+

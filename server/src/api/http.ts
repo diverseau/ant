@@ -35,6 +35,11 @@ const createAnt = z.object({
   accessory: accessories,
   model: z.string().optional(),
 })
+const eventSpec = z.discriminatedUnion('source', [
+  z.object({ source: z.literal('github'), repo: z.string().max(200), events: z.array(z.enum(['issue.opened', 'pr.opened', 'pr.merged', 'push', 'comment', 'release'])).max(6) }),
+  z.object({ source: z.literal('slack'), on: z.enum(['mention', 'message', 'phrase', 'reaction']), channel: z.string().max(80).optional(), phrase: z.string().max(200).optional(), emoji: z.string().max(60).optional() }),
+  z.object({ source: z.literal('watch'), url: z.string().max(2000), everyMinutes: z.number().int(), contains: z.string().max(200).optional() }),
+])
 const patchAnt = createAnt.partial().extend({
   status: z.enum(['idle', 'paused']).optional(),
   model: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,60}$/).optional(),
@@ -416,7 +421,8 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
         instruction: z.string().min(1).max(8000),
         when: z.string().max(200).default(''),
         tz: z.string().optional(),
-        trigger: z.enum(['schedule', 'webhook']).optional(),
+        trigger: z.enum(['schedule', 'webhook', 'event', 'watch']).optional(),
+        event: eventSpec.optional(),
       }),
     )
     return c.json(scheduler.create(b), 201)
@@ -424,7 +430,7 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   app.patch('/api/routines/:id', async (c) => {
     const b = await body(
       c,
-      z.object({ name: z.string().min(1).max(80).optional(), instruction: z.string().min(1).max(8000).optional(), when: z.string().max(200).optional(), tz: z.string().optional(), enabled: z.boolean().optional() }),
+      z.object({ name: z.string().min(1).max(80).optional(), instruction: z.string().min(1).max(8000).optional(), when: z.string().max(200).optional(), tz: z.string().optional(), enabled: z.boolean().optional(), event: eventSpec.optional() }),
     )
     return c.json(scheduler.update(c.req.param('id'), b))
   })

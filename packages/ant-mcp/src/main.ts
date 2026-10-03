@@ -151,13 +151,21 @@ server.registerTool(
   'schedule_routine',
   {
     description:
-      'Save a routine: work you will do automatically on a schedule (or when a webhook is called), even when the user is away. "when" accepts plain language or cron, e.g. "every weekday at 9am", "every 2 hours", "mondays at 14:00", "in 30m", "0 9 * * 1-5". Minimum interval 5 minutes. Confirm the schedule back to the user. It does not run immediately.',
+      'Save a routine: work you will do automatically on a schedule, when an event happens, or when a webhook is called, even when the user is away. For a schedule, "when" accepts plain language or cron, e.g. "every weekday at 9am", "every 2 hours", "mondays at 14:00", "in 30m", "0 9 * * 1-5" (minimum interval 5 minutes). For an event, leave "when" empty and set "event": a GitHub repo event, Slack activity (needs the Slack channel set up), or a public web page changing. Confirm what it reacts to back to the user. It does not run immediately.',
     inputSchema: {
       name: z.string().max(80),
       instruction: z.string().describe('What to do each run, written as a self-contained task, including where to report results and what needs approval'),
       when: z.string().default(''),
       tz: z.string().optional().describe('IANA time zone; defaults to the user setting'),
       webhook: z.boolean().optional().describe('Trigger by HTTP webhook instead of a schedule'),
+      event: z
+        .discriminatedUnion('source', [
+          z.object({ source: z.literal('github'), repo: z.string().describe('owner/repo'), events: z.array(z.enum(['issue.opened', 'pr.opened', 'pr.merged', 'push', 'comment', 'release'])) }),
+          z.object({ source: z.literal('slack'), on: z.enum(['mention', 'message', 'phrase', 'reaction']), channel: z.string().optional(), phrase: z.string().optional(), emoji: z.string().optional() }),
+          z.object({ source: z.literal('watch'), url: z.string().describe('Public http(s) page'), everyMinutes: z.number().int().min(5).max(1440), contains: z.string().optional().describe('Only fire once the page mentions this') }),
+        ])
+        .optional()
+        .describe('React to an event instead of a schedule'),
     },
   },
   (args) => call('schedule_routine', args),

@@ -2,7 +2,7 @@
 import type { ChannelStatus, ConnectorsView } from '@ant/shared'
 import type { AntEvent, ApprovalDecision, Bootstrap, Colony, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
-export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled'>>
+export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled' | 'event'>>
 export type ColonyPatch = { name?: string; memberIds?: string[]; leadAntId?: string }
 
 export class ApiError extends Error {

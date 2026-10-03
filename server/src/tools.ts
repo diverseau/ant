@@ -1,5 +1,6 @@
 // IPC handlers behind the `ant` MCP server's tools (plan §5).
 import { execFile } from 'node:child_process'
+import type { EventSpec } from '@ant/shared'
 import { existsSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { MemoryStore } from './memory/store.ts'
@@ -111,7 +112,10 @@ export function registerTools(svc: AntService, broker: Broker, scheduler: Schedu
   const routineErr = (err: unknown) => `Not saved: ${err instanceof Error ? err.message : String(err)}`
   ipc.on('schedule_routine', (antId, p) => {
     try {
-      const { routine, key } = scheduler.create({ antId, name: str(p.name), instruction: str(p.instruction), when: str(p.when), tz: str(p.tz) || undefined, trigger: p.webhook ? 'webhook' : 'schedule' })
+      const event = p.event && typeof p.event === 'object' ? (p.event as EventSpec) : undefined
+      const trigger = event ? (event.source === 'watch' ? 'watch' : 'event') : p.webhook ? 'webhook' : 'schedule'
+      const { routine, key } = scheduler.create({ antId, name: str(p.name), instruction: str(p.instruction), when: str(p.when), tz: str(p.tz) || undefined, trigger, ...(event && { event }) })
+      if (event) return `Saved routine "${routine.name}": ${routine.when}. It starts when that happens (the first check only records what's there now).`
       if (key) return `Saved webhook routine "${routine.name}". POST to ${routine.webhookUrl} with header "Authorization: Bearer ${key}" (shown once; tell the user to store it). JSON bodies are passed to you.`
       return `Saved routine "${routine.name}": ${routine.when}. Next run ${routine.nextRunAt ? new Date(routine.nextRunAt).toLocaleString('en-AU', { timeZone: routine.tz }) : 'never'}. It doesn't run now; the user can press Test to try it.`
     } catch (err) {

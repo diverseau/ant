@@ -93,6 +93,8 @@
   function nextRun(r: RoutineView) {
     if (!r.enabled) return 'Paused'
     if (r.trigger === 'webhook') return 'On webhook request'
+    if (r.trigger === 'event') return r.event?.source === 'slack' ? 'On Slack activity' : 'Watching GitHub'
+    if (r.trigger === 'watch') return 'Watching the page'
     if (r.nextRunAt === null) return 'No next run'
     const minutes = Math.ceil((r.nextRunAt - now) / 60_000)
     if (minutes <= 0) return 'Due now'
@@ -210,6 +212,7 @@
                 </span>
                 <span class="sr-only">{r.lastStatus ? `Last run: ${r.lastStatus}` : 'No runs yet'}</span>
                 <span class="sub schedule-text">{r.when}</span>
+                {#if r.check?.error}<span class="sub check-error" title={r.check.error}>Check failed: {r.check.error}</span>{/if}
                 <span class="sub next-run" title={r.nextRunAt ? `${new Date(r.nextRunAt).toLocaleString()} · ${r.tz}` : r.tz}>{nextRun(r)}</span>
               </button>
               <div class="routine-controls">
@@ -659,5 +662,12 @@
       opacity: 1;
       transform: none;
     }
+  }
+
+  .check-error {
+    color: #f4a69b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

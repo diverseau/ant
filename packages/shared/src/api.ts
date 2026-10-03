@@ -59,7 +59,11 @@ export interface RoutineView {
   /** Human description, e.g. "Weekdays at 9:00 AM · Australia/Sydney". */
   when: string
   tz: string
-  trigger: 'schedule' | 'webhook'
+  trigger: RoutineTrigger
+  /** Event and watch routines: what they listen for. */
+  event?: EventSpec
+  /** Polled triggers (GitHub, pages): when antd last checked, and why that failed. */
+  check?: { at: number; error: string | null }
   enabled: boolean
   nextRunAt: number | null
   lastRunAt: number | null
@@ -67,6 +71,17 @@ export interface RoutineView {
   /** Present for webhook routines: POST here with `Authorization: Bearer <key>`. */
   webhookUrl?: string
 }
+
+export type RoutineTrigger = 'schedule' | 'webhook' | 'event' | 'watch'
+
+/** What an event or watch routine reacts to. GitHub and pages are polled by antd, so neither
+ * needs a public URL; Slack events arrive over the Slack channel's Socket Mode connection. */
+export type EventSpec =
+  | { source: 'github'; repo: string; events: GitHubEvent[] }
+  | { source: 'slack'; on: 'mention' | 'message' | 'phrase' | 'reaction'; channel?: string; phrase?: string; emoji?: string }
+  | { source: 'watch'; url: string; everyMinutes: number; contains?: string }
+
+export type GitHubEvent = 'issue.opened' | 'pr.opened' | 'pr.merged' | 'push' | 'comment' | 'release'
 
 export interface RoutineRunView {
   id: string
@@ -84,7 +99,9 @@ export interface CreateRoutineInput {
   /** Natural language or cron: "every weekday at 9am", "every 2 hours", "0 9 * * 1-5". Ignored for webhooks. */
   when: string
   tz?: string
-  trigger?: 'schedule' | 'webhook'
+  trigger?: RoutineTrigger
+  /** Required for event and watch routines. */
+  event?: EventSpec
 }
 
 export interface ClaudeAiConnector {

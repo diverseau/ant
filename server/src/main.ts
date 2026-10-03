@@ -32,6 +32,7 @@ svc.registry = new Registry(db, vault)
 const broker = new Broker(svc)
 const scheduler = new Scheduler(svc)
 svc.routineViews = () => scheduler.list()
+scheduler.githubToken = () => svc.registry?.secretValue('GITHUB_TOKEN') ?? null
 const channels = new ChannelHub(
   svc,
   async (kind: ChannelKind, token: string): Promise<ChannelAdapter> => {
