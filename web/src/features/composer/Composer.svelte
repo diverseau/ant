@@ -7,7 +7,6 @@
   import Camera from '@lucide/svelte/icons/camera'
   import Sparkles from '@lucide/svelte/icons/sparkles'
   import Plug from '@lucide/svelte/icons/plug'
-  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import { tick } from 'svelte'
   import Ant from '../../lib/ant/Ant.svelte'
   import { connectors, skills as mockSkills } from '../../lib/mock/data'
@@ -15,6 +14,7 @@
   import { app, notify, send, stop, threadMembers } from '../../lib/store.svelte'
   import type { Thread } from '../../lib/types'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
+  import RunOptions from './RunOptions.svelte'
 
   let { thread, placeholder, hero = false }: { thread: Thread; placeholder: string; hero?: boolean } = $props()
 
@@ -27,6 +27,7 @@
 
   const value = $derived(app.drafts[thread.id] ?? '')
   const working = $derived(!!app.typing[thread.id])
+  const ant = $derived(thread.kind === 'ant' ? app.ants.find((a) => a.id === thread.refId) : undefined)
   // Attachments: uploaded straight away into the ant's inbox/, named in the message on send.
   type Attachment = { id: string; name: string; path?: string; bytes: number; state: 'uploading' | 'ready' | 'error'; error?: string }
   let attachments: Attachment[] = $state([])
@@ -295,8 +296,11 @@
   </div>
 
   <div class="foot">
-    <span>Ants can make mistakes. Check before anything leaves your hands.</span>
-    <span class="review"><ShieldCheck size={13} /> Auto-review on</span>
+    {#if ant}
+      <RunOptions {ant} busy={working} />
+    {:else}
+      <span class="colony-note">Each ant keeps its own model and permissions.</span>
+    {/if}
   </div>
 </div>
 
@@ -514,22 +518,15 @@
 
   .foot {
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 9px 6px 0;
+    align-items: center;
+    min-height: 28px;
+    padding: 6px 2px 0;
+  }
+
+  .colony-note {
+    padding: 0 8px;
     font-size: var(--text-xs);
     color: var(--text-faint);
-  }
-
-  .review {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-  }
-
-  .hero .foot {
-    display: none;
   }
 
   .popover {

@@ -45,6 +45,15 @@ Every ant is fenced in by four layers:
 
 Ants can't approve themselves: Ant's own API and UI are unreachable from their shell and their browser.
 
+Under each ant's chat box you pick its **model**, **effort** (and Fast mode on Opus) and **permissions**:
+
+| Permissions | What the ant may do without asking |
+| --- | --- |
+| Supervised | Read and search. Every file change and command asks. |
+| Auto-accept edits (default) | Edit its own folder and run sandboxed commands. |
+| Auto | Claude Code's auto mode reviews each action (Sonnet and Opus; Haiku falls back to asking). |
+| Full access | Write anywhere in your home and run commands without prompts. Credentials stay denied, commands stay in the sandbox's network fence, and the floors still block or ask. |
+
 ## How it works
 
 ```

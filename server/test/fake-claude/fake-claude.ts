@@ -141,15 +141,18 @@ async function tool(name: string, input: Record<string, unknown>, signal: AbortS
   emit({ ...assistant, message: { ...assistant.message, id: `msg_${randomUUID()}`, content: [{ type: 'tool_use', id, name, input }] } })
   let error = false
   let output: unknown = 'Simulated tool completed.'
-  const verdict = name === 'Bash' ? await hook(name, input, id, signal) : undefined
+  // Real Claude Code hooks every tool; the double keeps to Bash except in bypass mode,
+  // where the hook is the only gate left.
+  const bypass = value('--permission-mode') === 'bypassPermissions'
+  const verdict = name === 'Bash' || bypass ? await hook(name, input, id, signal) : undefined
   if (verdict?.permissionDecision === 'deny') {
     error = true
     output = `Permission denied: ${verdict.permissionDecisionReason}`
   } else {
     // Ant's tools are explicitly allowed in generated settings and gate themselves.
     // File tools always visit the real broker, including inside-folder allows.
-    const needsPermission = !name.startsWith('mcp__ant__') && name !== 'Bash'
-      || verdict?.permissionDecision === 'ask' || !!input.dangerouslyDisableSandbox
+    const needsPermission = !bypass && (!name.startsWith('mcp__ant__') && name !== 'Bash' || !!input.dangerouslyDisableSandbox)
+      || verdict?.permissionDecision === 'ask'
     if (needsPermission) {
       const response = await call(value('--permission-prompt-tool') ?? 'mcp__ant__permission', { tool_name: name, input, tool_use_id: id }, signal)
       const contents = response.content as Array<{ type: string; text?: string }>

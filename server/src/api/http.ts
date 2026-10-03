@@ -30,7 +30,13 @@ const createAnt = z.object({
   accessory: accessories,
   model: z.string().optional(),
 })
-const patchAnt = createAnt.partial().extend({ status: z.enum(['idle', 'paused']).optional() })
+const patchAnt = createAnt.partial().extend({
+  status: z.enum(['idle', 'paused']).optional(),
+  model: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,60}$/).optional(),
+  effort: z.enum(['', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  fast: z.boolean().optional(),
+  permissionMode: z.enum(['supervised', 'edits', 'auto', 'full']).optional(),
+})
 
 export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler, channels: ChannelHub, health: () => Health) {
   const app = new Hono()

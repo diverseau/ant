@@ -11,9 +11,9 @@
   const h = $derived(app.health)
 
   const models = [
-    { id: 'sonnet', label: 'Sonnet', note: 'Balanced. Good default.' },
-    { id: 'opus', label: 'Opus', note: 'Strongest. Uses your limits fastest.' },
-    { id: 'haiku', label: 'Haiku', note: 'Fastest and lightest. Good for routines.' },
+    { id: 'sonnet', label: 'Sonnet 5.5', note: 'Balanced. Good default.' },
+    { id: 'opus', label: 'Opus 5.5', note: 'Strongest. Uses your limits fastest.' },
+    { id: 'haiku', label: 'Haiku 4.5', note: 'Fastest and lightest. Good for routines.' },
   ]
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
 
@@ -75,6 +75,7 @@
             </button>
           {/each}
         </div>
+        <small>Each ant can switch model, effort and permissions under its chat box.</small>
       </div>
 
       <div class="field">

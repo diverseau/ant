@@ -1,3 +1,5 @@
+import type { Effort, PermissionMode } from './models.ts'
+
 export type AntColor = 'coral' | 'purple' | 'yellow' | 'green' | 'blue'
 export type Accessory = 'none' | 'satchel' | 'leaf' | 'wrench' | 'glasses'
 export type AntStatus = 'idle' | 'working' | 'attention' | 'paused'
@@ -6,6 +8,10 @@ export interface Ant {
   id: string
   slug?: string
   model?: string
+  /** Empty or absent: the model's own default. */
+  effort?: Effort | ''
+  fast?: boolean
+  permissionMode?: PermissionMode
   name: string
   label?: string
   description: string

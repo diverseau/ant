@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { MemoryStore } from './memory/store.ts'
-import type { Broker } from './broker.ts'
+import { SEND_TOOL, targetsSelf, type Broker } from './broker.ts'
 import type { Scheduler } from './scheduler/runtime.ts'
 import * as R from './db/repos/index.ts'
 import { toAnt } from './mappers.ts'
@@ -170,6 +170,16 @@ export const floors = {
   /** Hardline command floors + (later) the computer lease (plan §4). */
   async check(svc: AntService, antId: string, p: P): Promise<{ action: 'block' | 'ask' | 'pass'; message?: string }> {
     const tool = str(p.tool_name)
+    // Full access and auto mode skip Ant's permission prompt, so these hold here in every mode.
+    // (Shell commands are covered by the sandbox's network deny; the browser by CDP interception.)
+    if ((tool === 'WebFetch' || tool === 'mcp__browser__browser_navigate') && targetsSelf(JSON.stringify(p.tool_input ?? {}), svc.cfg.selfPorts)) {
+      return { action: 'block', message: "That address is Ant's own control panel, which ants can't access. Don't retry." }
+    }
+    const mode = R.getAnt(svc.db, antId)?.permissionMode
+    if ((mode === 'full' || mode === 'auto') && /^mcp__/.test(tool) && !/^mcp__(ant|browser)__/.test(tool) && SEND_TOOL.test(tool)) {
+      // Sends go through the approval card, where an approved draft's text is let through.
+      return { action: 'ask', message: 'Sends a message on your behalf' }
+    }
     if (tool.startsWith('mcp__browser__')) {
       // Fail closed while the user drives: they may be typing a password (Hermes lease rule).
       if (svc.computers.lease(antId) === 'user') return { action: 'block', message: `${svc.userName} is using your browser right now. Wait for them to hand it back; you'll get a message.` }

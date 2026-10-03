@@ -2,6 +2,17 @@
 
 All notable changes to Ant. Versions follow [Semantic Versioning](https://semver.org); commits follow Conventional Commits.
 
+## Unreleased
+
+### Added
+- Model, effort and permission pickers under the chat box, per ant. Models: Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Opus 5, Sonnet 5, Haiku 4.5, plus seven legacy models; search, favourites and Ctrl+1–6 in the menu.
+- Effort (Low to Max, defaulting to the model's own) and Fast mode on Opus. When Claude Code serves a turn at standard speed anyway, Ant says why (e.g. extra usage is off for the account).
+- Permission modes: Supervised, Auto-accept edits (the previous behaviour, still the default), Auto (`--permission-mode auto`), Full access (`bypassPermissions`, home-wide sandbox writes, no unsandboxed escape).
+- Changes apply on the ant's next turn; a busy ant restarts once its current turn ends.
+
+### Security
+- In Auto and Full access the PreToolUse floors also deny WebFetch/browser navigation to Ant's own ports and send connector messages through the approval card, since those modes skip the permission prompt.
+
 ## 0.9.0 — 2026-10-03
 
 The first working Ant: real ants on real Claude Code sessions.

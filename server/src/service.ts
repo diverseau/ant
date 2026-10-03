@@ -1,7 +1,7 @@
 // antd's core: owns ants, their `claude` processes, turns, and the event stream to the UI.
 import { randomBytes, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, UsageWindows } from '@ant/shared'
+import type { Ant, AntEvent, Bootstrap, CreateAntInput, Message, PermissionMode, UsageWindows } from '@ant/shared'
 import { LoopGuard } from './colony/loop-guard.ts'
 import { ComputerManager } from './computer/manager.ts'
 import { SkillRegistry } from './skills/registry.ts'
@@ -48,6 +48,18 @@ interface Live {
   lastText: string
   /** This turn's Computer card, created on first browser use. */
   computerCard: string | null
+  /** Run options changed mid-turn: start a fresh process once this turn ends. */
+  restartAfterTurn?: boolean
+  /** Told the user why fast mode is off for this process. */
+  fastNoticed?: boolean
+}
+
+// Claude Code's fast_mode_disabled_reason values, in words.
+const FAST_OFF: Record<string, string> = {
+  extra_usage_disabled: 'fast mode bills extra usage, which is off for your Claude account',
+  model_not_allowed: "fast mode isn't available for this model",
+  free: 'fast mode needs a paid plan',
+  not_first_party: 'fast mode needs a direct Anthropic sign-in',
 }
 
 const PRIORITY: Record<TurnSource, number> = { user: 0, system: 1, ant: 2, routine: 3 }
@@ -186,7 +198,7 @@ export class AntService {
     return ant
   }
 
-  updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'status' | 'model'>>): Ant {
+  updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'status' | 'model' | 'effort' | 'fast' | 'permissionMode'>>): Ant {
     const row = this.antRow(id)
     if (patch.name && patch.name.trim() !== row.name) {
       const clash = this.findAntByName(patch.name)
@@ -200,12 +212,20 @@ export class AntService {
       ...(patch.color !== undefined && { color: patch.color }),
       ...(patch.accessory !== undefined && { accessory: patch.accessory }),
       ...(patch.model !== undefined && { model: patch.model }),
+      ...(patch.effort !== undefined && { effort: patch.effort }),
+      ...(patch.fast !== undefined && { fast: patch.fast }),
+      ...(patch.permissionMode !== undefined && { permissionMode: patch.permissionMode }),
       ...(patch.status !== undefined && { status: patch.status }),
     })!
     if (patch.status === 'paused') this.stopAnt(id)
-    // Identity changes reach the ant on its next session; restart an idle one now.
+    // Identity and run-option changes reach the ant on its next session: restart an idle
+    // one now, a busy one as soon as its turn ends.
     const l = this.live.get(id)
-    if (l && !l.current && (patch.name || patch.description || patch.label || patch.model)) this.stopAnt(id)
+    const runOptions = ['model', 'effort', 'fast', 'permissionMode'] as const
+    if (l && (patch.name || patch.description || patch.label || runOptions.some((k) => patch[k] !== undefined))) {
+      if (l.current) l.restartAfterTurn = true
+      else this.stopAnt(id)
+    }
     const ant = toAnt(next)
     this.emit({ type: 'ant.updated', ant })
     return ant
@@ -404,6 +424,8 @@ export class AntService {
         cdpPorts: all.map((a) => this.cdpPort(a.id)),
         network: R.getSetting(this.db, `ant.${antId}.network`, 'open') as 'open' | 'allowlist',
         allowedDomains: R.getSetting<string[]>(this.db, `ant.${antId}.domains`, []),
+        permissionMode: row.permissionMode as PermissionMode,
+        fast: row.fast,
       },
       token,
       all.filter((a) => a.id !== antId).map((a) => antPaths(this.cfg, { id: a.id, slug: a.slug }).folder),
@@ -471,6 +493,7 @@ export class AntService {
         mcpConfigPath: paths.mcpConfig,
         model: row.model || this.cfg.defaultModel,
         effort: row.effort || undefined,
+        permissionMode: row.permissionMode as PermissionMode,
         env: { ...(this.registry?.forAnt(antId).env ?? {}), ANT_SOCKET: this.cfg.socketPath, ANT_TOKEN: token, ANT_ID: antId },
       },
       {
@@ -588,6 +611,11 @@ export class AntService {
           })
         }
         R.addUsage(this.db, { date: new Date().toISOString().slice(0, 10), antId, costUsd: cost, tokens: e.usage.input + e.usage.output })
+        if (e.fastOff && !l.fastNoticed && R.getAnt(this.db, antId)?.fast) {
+          l.fastNoticed = true
+          const name = R.getAnt(this.db, antId)?.name ?? 'This ant'
+          this.emit({ type: 'notice', level: 'warn', text: `${name} ran at standard speed: ${FAST_OFF[e.fastOff] ?? `fast mode is unavailable (${e.fastOff})`}.` })
+        }
         if (!e.ok && e.subtype !== 'error_during_execution') {
           const text = e.errors.join('\n') || e.text || e.subtype
           this.insert(threadId, antId, 'error', { detail: text }, limitText(text) ?? 'Something went wrong on that turn.', l.runId)
@@ -655,6 +683,7 @@ export class AntService {
         enqueuedAt: Date.now(),
       })
     }
+    if (l.restartAfterTurn) this.stopAnt(antId)
     this.pump()
   }
 

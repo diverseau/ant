@@ -42,4 +42,12 @@ describe('StreamParser', () => {
     expect(ev.some((e) => e.t === 'rate_limit' && e.fiveHour && e.fiveHour.resetsAt > 1e12)).toBe(true)
     expect(ev.some((e) => e.t === 'control' && e.ok)).toBe(true)
   })
+
+  it('reports why fast mode was off, and nothing when it ran', () => {
+    const base = { type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0, usage: {} }
+    const [off] = new StreamParser().feed({ ...base, fast_mode_state: 'off', fast_mode_disabled_reason: 'extra_usage_disabled' })
+    const [on] = new StreamParser().feed({ ...base, fast_mode_state: 'on' })
+    expect(off).toMatchObject({ t: 'result', fastOff: 'extra_usage_disabled' })
+    expect(on).not.toHaveProperty('fastOff')
+  })
 })

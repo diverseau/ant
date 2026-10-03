@@ -14,6 +14,7 @@ export interface SpawnSpec {
   mcpConfigPath: string
   model: string
   effort?: string
+  permissionMode?: 'supervised' | 'edits' | 'auto' | 'full'
   env: Record<string, string>
 }
 
@@ -40,6 +41,9 @@ export function buildArgs(spec: SpawnSpec): string[] {
     '--permission-prompt-tool', 'mcp__ant__permission',
     '--model', spec.model,
     ...(spec.effort ? ['--effort', spec.effort] : []),
+    // Supervised and auto-accept edits are both the CLI default mode; settings.json tells them apart.
+    ...(spec.permissionMode === 'auto' ? ['--permission-mode', 'auto'] : []),
+    ...(spec.permissionMode === 'full' ? ['--permission-mode', 'bypassPermissions'] : []),
   ]
 }
 

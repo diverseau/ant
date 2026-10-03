@@ -10,7 +10,7 @@ export type StreamEvent =
   | { t: 'tool.result'; toolUseId: string; isError: boolean; summary: string }
   | { t: 'thinking'; key: string }
   | { t: 'rate_limit'; status: string; fiveHour?: Window; sevenDay?: Window }
-  | { t: 'result'; ok: boolean; subtype: string; totalCostUsd: number; turns: number; durationMs: number; usage: TokenUsage; text: string | null; errors: string[] }
+  | { t: 'result'; ok: boolean; subtype: string; totalCostUsd: number; turns: number; durationMs: number; usage: TokenUsage; text: string | null; errors: string[]; fastOff?: string }
   | { t: 'control'; requestId: string; ok: boolean }
   | { t: 'task'; taskId: string; toolUseId: string; status: string; summary: string }
 
@@ -186,6 +186,7 @@ export class StreamParser {
       },
       text: typeof m.result === 'string' ? m.result : null,
       errors: Array.isArray(m.errors) ? m.errors.map(String) : [],
+      ...(m.fast_mode_state !== 'on' && typeof m.fast_mode_disabled_reason === 'string' && { fastOff: m.fast_mode_disabled_reason }),
     }
   }
 }

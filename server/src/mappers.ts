@@ -1,5 +1,5 @@
 // Database rows → shared domain objects sent to the web app.
-import type { Accessory, Ant, AntColor, AntStatus, Colony, Message, Thread } from '@ant/shared'
+import type { Accessory, Ant, AntColor, AntStatus, Colony, Effort, Message, PermissionMode, Thread } from '@ant/shared'
 import type * as R from './db/repos/index.ts'
 
 export function toAnt(row: R.Ant): Ant {
@@ -13,6 +13,9 @@ export function toAnt(row: R.Ant): Ant {
     accessory: row.accessory as Accessory,
     status: row.status as AntStatus,
     model: row.model,
+    effort: row.effort as Effort | '',
+    fast: row.fast,
+    permissionMode: row.permissionMode as PermissionMode,
   }
 }
 

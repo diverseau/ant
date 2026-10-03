@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Ant } from '@ant/shared'
+import type { Ant, PermissionMode } from '@ant/shared'
 import { antDataDir, type Config } from '../config.ts'
 
 export interface AntPaths {
@@ -35,6 +35,10 @@ export interface ProvisionContext {
   toolsBlock: string
   /** Every ant's Chromium debugging port: shell access would hand over that browser and its logins. */
   cdpPorts: number[]
+  /** How much the ant may do without asking (composer permissions picker). Default 'edits'. */
+  permissionMode?: PermissionMode
+  /** Fast mode (Opus; billed as extra usage on subscriptions). */
+  fast?: boolean
 }
 
 const ANT_MCP_MAIN = fileURLToPath(new URL('../../../packages/ant-mcp/src/main.ts', import.meta.url))
@@ -94,13 +98,17 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
   const denies = credentialDenies(cfg)
   // Other ants' browser profiles hold their logins.
   for (const o of others) denies.push(`//${join(o, 'browser').slice(1)}/**`)
+  const mode = ctx.permissionMode ?? 'edits'
+  const osPaths = denies.map((d) => d.replace(/^\/\//, '/').replace(/\/\*\*$/, ''))
   return {
+    ...(ctx.fast && { fastMode: true }),
     permissions: {
       allow: [
         'Read',
         'Glob',
         'Grep',
-        `Edit(${own})`,
+        // Supervised ants ask before every file change, even in their own folder.
+        ...(mode === 'supervised' ? [] : [`Edit(${own})`]),
         'WebSearch',
         ...(ctx.network === 'open' ? ['WebFetch(domain:*)'] : ['WebFetch', ...ctx.allowedDomains.map((d) => `WebFetch(domain:${d})`)]),
         'mcp__ant__*',
@@ -114,11 +122,18 @@ export function settingsFor(cfg: Config, paths: AntPaths, ctx: ProvisionContext,
     },
     sandbox: {
       enabled: true,
-      autoAllowBashIfSandboxed: true,
+      autoAllowBashIfSandboxed: mode !== 'supervised',
+      // Full access runs without prompts, so a command must never leave the sandbox: that
+      // keeps the network deny below (Ant's own API) in force.
+      ...(mode === 'full' && { allowUnsandboxedCommands: false }),
       // Inside the Ant container there are no privileged namespaces for bubblewrap; the
       // container is the outer boundary (Claude Code sandboxing docs, "Linux sandbox strength").
       ...(process.env.ANT_IN_CONTAINER === '1' && { enableWeakerNestedSandbox: true }),
-      filesystem: { denyRead: denies.map((d) => d.replace(/^\/\//, '/').replace(/\/\*\*$/, '')) },
+      filesystem: {
+        denyRead: osPaths,
+        // Full access may write anywhere in the user's home except credentials and Ant's data.
+        ...(mode === 'full' && { allowWrite: [homedir()], denyWrite: osPaths }),
+      },
       network: {
         ...(ctx.network === 'allowlist' && { allowedDomains: ctx.allowedDomains, strictAllowlist: true }),
         // Shell commands must not reach antd's API (an ant could approve itself).
@@ -167,7 +182,7 @@ ${ant.description.trim()}
 ## Your home
 - Your folder is \`${paths.folder}\`. Read, write and delete freely inside it. Put work you produce in \`workspace/\`; files ${ctx.userName} gives you arrive in \`inbox/\`.
 - You may READ files anywhere else on this computer unless access is blocked.
-- Do NOT create, change, move or delete anything outside your folder unless ${ctx.userName} explicitly asked for that exact change. If you're unsure, ask first with the \`request_approval\` tool. Ant will also ask ${ctx.userName} before any such write.
+- Do NOT create, change, move or delete anything outside your folder unless ${ctx.userName} explicitly asked for that exact change. If you're unsure, ask first with the \`request_approval\` tool. ${ctx.permissionMode === 'full' ? `You have full access, so nothing will stop such a write: the care is yours.` : `Ant will also ask ${ctx.userName} before any such write.`}
 - Never try to read credentials, keys, cookies or other ants' browser profiles.
 
 ## How to work with ${ctx.userName}

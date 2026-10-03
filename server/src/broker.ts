@@ -9,7 +9,7 @@ import { decide, type Rule } from './rules/engine.ts'
 import { HttpError, type AntService } from './service.ts'
 
 const UNATTENDED_TTL = 10 * 60_000
-const SEND_TOOL = /(^|_)(send|reply|forward|post|create_draft|draft)(_|$)/i
+export const SEND_TOOL = /(^|_)(send|reply|forward|post|create_draft|draft)(_|$)/i
 
 type Waiter = (d: ApprovalDecision) => void
 
