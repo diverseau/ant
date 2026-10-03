@@ -27,11 +27,17 @@
     return ant.label ?? 'Idle'
   })
 
-  const suggestions = $derived(
-    ant
-      ? [`What can you do, ${ant.name}?`, 'Check the staging site for bugs', 'Draft an email to Mara', '/morning-brief']
-      : [],
-  )
+  // First-run prompts: real skills first, then ones that fit any ant (live); the demo keeps its script.
+  const suggestions = $derived.by(() => {
+    if (!ant) return []
+    if (app.mode !== 'live') return [`What can you do, ${ant.name}?`, 'Check the staging site for bugs', 'Draft an email to Mara', '/morning-brief']
+    return [
+      `What can you do, ${ant.name}?`,
+      ...app.skills.slice(0, 2).map((s) => `/${s.name}`),
+      ant.label ? `What should a ${ant.label.toLowerCase()} check every morning?` : 'Set up a routine for every weekday morning',
+      'Remember that I prefer short answers',
+    ].slice(0, 4)
+  })
 </script>
 
 {#if thread}

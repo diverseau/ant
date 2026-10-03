@@ -804,6 +804,7 @@
   }
 
   .tmpl .btn {
+    text-decoration: none;
     height: 30px;
     font-size: var(--text-xs);
   }
