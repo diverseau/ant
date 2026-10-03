@@ -14,7 +14,7 @@
   import { Spring } from 'svelte/motion'
   import { mod } from '../../lib/format'
   import { collapse, rise, pop } from '../../lib/motion'
-  import { app, deleteThread, select, sortedThreads, togglePin } from '../../lib/store.svelte'
+  import { app, deleteThread, importAntFile, select, sortedThreads, togglePin } from '../../lib/store.svelte'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
   import UsageRing from '../../lib/ui/UsageRing.svelte'
   import ThreadRow from './ThreadRow.svelte'
@@ -49,6 +49,8 @@
       items: [
         { label: 'New ant', onclick: () => (app.overlay = 'new-ant') },
         { label: 'New colony', onclick: () => (app.overlay = 'new-colony') },
+        ...(app.mode === 'live' ? [{ label: 'Import an ant…', onclick: () => importInput?.click() }] : []),
+        ...(app.ants.some((a) => a.hidden) ? [{ label: app.showHidden ? 'Hide hidden ants' : `Show hidden ants (${app.ants.filter((a) => a.hidden).length})`, onclick: () => (app.showHidden = !app.showHidden) }] : []),
       ],
     }
   }
@@ -101,8 +103,10 @@
 
   // Approvals and hand-offs still open, across every chat.
   const waitingCount = $derived(app.threads.reduce((n, t) => n + t.messages.filter((m) => m.kind === 'approval' && !m.decision).length, 0))
+  let importInput: HTMLInputElement | undefined = $state()
 </script>
 
+<input bind:this={importInput} type="file" accept=".json,application/json" hidden onchange={(e) => { const f = e.currentTarget.files?.[0]; if (f) importAntFile(f); e.currentTarget.value = '' }} />
 <aside class="sidebar" class:collapsed={app.sidebarCollapsed}>
   <header>
     <button

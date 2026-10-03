@@ -47,7 +47,7 @@ registerTools(svc, broker, scheduler)
 svc.push = new PushHub(db, () => process.env.ANT_PUBLIC_URL || tailscaleInfo(cfg.port).url || 'mailto:ant@localhost')
 svc.bus.on('turn.finished', (e: { antId: string; turn: { threadId: string; source: string }; ok: boolean; text: string }) => {
   if (!e.ok || (e.turn.source !== 'user' && e.turn.source !== 'routine') || !e.text.trim()) return
-  svc.alert({ title: R.getAnt(db, e.antId)?.name ?? 'Ant', body: e.text.trim().replace(/\s+/g, ' '), url: `/?thread=${e.turn.threadId}`, tag: e.turn.threadId })
+  svc.alert({ title: R.getAnt(db, e.antId)?.name ?? 'Ant', body: e.text.trim().replace(/\s+/g, ' '), url: `/?thread=${e.turn.threadId}`, tag: e.turn.threadId }, false, e.antId)
 })
 
 function which(bin: string): boolean {

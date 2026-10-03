@@ -1,5 +1,5 @@
 // Client for antd: REST calls and the live event stream.
-import type { ActivityView, ChannelStatus, ConnectorsView } from '@ant/shared'
+import type { ActivityView, AntTemplate, ChannelStatus, ConnectorsView } from '@ant/shared'
 import type { AntEvent, ApprovalDecision, Bootstrap, Colony, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
 export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled' | 'event'>>
@@ -50,6 +50,9 @@ export const api = {
   editMemory: (antId: string, b: { target: 'memory' | 'user'; op: 'add' | 'replace' | 'remove'; text: string; old?: string }) =>
     req<{ memory: string[]; user: string[] }>('POST', `/api/ants/${antId}/memory`, b),
   rate: (messageId: string, rating: 'up' | 'down' | null) => req<void>('POST', `/api/messages/${messageId}/rating`, { rating }),
+  exportAnt: (antId: string) => req<AntTemplate>('GET', `/api/ants/${antId}/export`),
+  importAnt: (template: AntTemplate, name?: string) => req<{ antId: string; skipped: string[] }>('POST', '/api/ants/import', { template, name }),
+  duplicateAnt: (antId: string) => req<{ antId: string; skipped: string[] }>('POST', `/api/ants/${antId}/duplicate`),
   activity: () => req<ActivityView>('GET', '/api/activity'),
   authStatus: () => req<{ trusted: boolean; authenticated: boolean; device: { id: string; name: string } | null }>('GET', '/api/auth/status'),
   pair: (code: string, name: string) => req<{ device: { id: string; name: string } }>('POST', '/api/auth/pair', { code, name }),

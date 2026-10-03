@@ -9,6 +9,8 @@
   import Play from '@lucide/svelte/icons/play'
   import Pencil from '@lucide/svelte/icons/pencil'
   import Plus from '@lucide/svelte/icons/plus'
+  import CopyIcon from '@lucide/svelte/icons/copy'
+  import Download from '@lucide/svelte/icons/download'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import Crown from '@lucide/svelte/icons/crown'
   import X from '@lucide/svelte/icons/x'
@@ -18,7 +20,7 @@
   import { skills as mockSkills } from '../../lib/mock/data'
   import { api } from '../../lib/api'
   import type { RuleView } from '@ant/shared'
-  import { app, colonyById, deleteColony, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateColony, updateRoutine, notify } from '../../lib/store.svelte'
+  import { app, colonyById, deleteColony, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateColony, updateRoutine, notify, duplicateAnt } from '../../lib/store.svelte'
   import { collapse, rise } from '../../lib/motion'
   import Switch from '../../lib/ui/Switch.svelte'
   import RoutineEditor from '../routines/RoutineEditor.svelte'
@@ -313,6 +315,30 @@
         {/each}
       {/if}
     </section>
+
+    {#if app.mode === 'live'}
+      <section>
+        <div class="item row">
+          <div>
+            <div>Notifications</div>
+            <div class="sub">Replies and messages from {ant.name}. Approvals always notify.</div>
+          </div>
+          <Switch bind:checked={() => !ant.muted, (v) => updateAnt(ant.id, { muted: !v })} label="Notifications from {ant.name}" />
+        </div>
+        <div class="item row">
+          <div>
+            <div>Show in sidebar</div>
+            <div class="sub">Hidden ants stay in search and Activity.</div>
+          </div>
+          <Switch bind:checked={() => !ant.hidden, (v) => updateAnt(ant.id, { hidden: !v })} label="Show {ant.name} in the sidebar" />
+        </div>
+        <div class="tmpl">
+          <button class="btn btn-ghost" onclick={() => duplicateAnt(ant.id)}><CopyIcon size={13} /> Duplicate</button>
+          <a class="btn btn-ghost" href="/api/ants/{ant.id}/export" download><Download size={13} /> Export</a>
+        </div>
+        <p class="hint">Duplicate and Export copy the profile, skills, routines and rules. Never history, memory, files, logins or secrets.</p>
+      </section>
+    {/if}
 
     <section class="danger">
       <div class="item row">
@@ -769,5 +795,16 @@
 
   button.item.skill:hover:not(:disabled) {
     background: var(--bg-hover);
+  }
+
+  .tmpl {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .tmpl .btn {
+    height: 30px;
+    font-size: var(--text-xs);
   }
 </style>

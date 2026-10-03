@@ -103,6 +103,18 @@ export interface ActivityView {
   }>
 }
 
+/** An ant as a shareable file: profile, skills, routines and rules. Never history, memory,
+ * files, browser logins or secrets. */
+export interface AntTemplate {
+  format: 'ant-template'
+  version: 1
+  ant: { name: string; label: string; description: string; color: string; accessory: string; model: string; effort?: string; fast?: boolean; permissionMode?: string }
+  skills: Array<{ name: string; description: string; body: string }>
+  routines: Array<{ name: string; instruction: string; trigger: RoutineTrigger; when?: string; event?: EventSpec; tz?: string; enabled?: boolean }>
+  rules: Array<{ pattern: string; behaviour: 'allow' | 'ask' | 'handoff' | 'deny'; label: string; inputContains?: string }>
+  guidance: string[]
+}
+
 export interface RoutineRunView {
   id: string
   routineId: string
@@ -110,6 +122,8 @@ export interface RoutineRunView {
   startedAt: number
   endedAt: number | null
   output: string | null
+  /** API-equivalent value of the run (subscription usage, not a bill). */
+  costUsd?: number
 }
 
 export interface CreateRoutineInput {

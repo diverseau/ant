@@ -6,7 +6,7 @@ import { antDataDir } from '../config.ts'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createNodeWebSocket } from '@hono/node-ws'
-import type { AntEvent, ApprovalDecision, CreateAntInput, Health, UsageWindows } from '@ant/shared'
+import type { AntEvent, AntTemplate, ApprovalDecision, CreateAntInput, Health, UsageWindows } from '@ant/shared'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { Broker } from '../broker.ts'
@@ -17,6 +17,7 @@ import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
 import { activity } from '../activity.ts'
+import { exportAnt, importAnt } from '../templates.ts'
 import { MemoryStore } from '../memory/store.ts'
 import { Auth, LOCAL_HOSTS, SESSION_COOKIE, hostOf } from '../auth/auth.ts'
 import { remoteStatus, setTailscale } from '../auth/remote.ts'
@@ -48,6 +49,8 @@ const patchAnt = createAnt.partial().extend({
   effort: z.enum(['', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   fast: z.boolean().optional(),
   permissionMode: z.enum(['supervised', 'edits', 'auto', 'full']).optional(),
+  muted: z.boolean().optional(),
+  hidden: z.boolean().optional(),
 })
 
 export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler, channels: ChannelHub, health: () => Health) {
@@ -161,6 +164,22 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
 
   app.post('/api/ants', async (c) => c.json(svc.createAnt((await body(c, createAnt)) as CreateAntInput), 201))
   app.patch('/api/ants/:id', async (c) => c.json(svc.updateAnt(c.req.param('id'), await body(c, patchAnt))))
+  // Templates: export an ant to a file, import one, or duplicate (export + import in one step).
+  app.get('/api/ants/:id/export', (c) => {
+    const t = exportAnt(svc, scheduler, svc.antRow(c.req.param('id')).id)
+    return c.json(t, 200, { 'content-disposition': `attachment; filename="${t.ant.name.replace(/[^\w.-]+/g, '-')}.ant.json"` })
+  })
+  app.post('/api/ants/import', async (c) => {
+    const b = (await c.req.json().catch(() => null)) as { template?: AntTemplate; name?: string } | null
+    if (!b?.template) throw new HttpError(400, 'Not an Ant template file.')
+    return c.json(importAnt(svc, scheduler, b.template, b.name), 201)
+  })
+  app.post('/api/ants/:id/duplicate', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const t = exportAnt(svc, scheduler, id)
+    return c.json(importAnt(svc, scheduler, t, `${t.ant.name} copy`), 201)
+  })
+
   app.delete('/api/ants/:id', (c) => {
     svc.deleteAnt(c.req.param('id'))
     return c.body(null, 204)

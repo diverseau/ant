@@ -14,16 +14,18 @@ export interface Ant {
   effort: string
   fast: boolean
   permissionMode: string
+  muted: boolean
+  hidden: boolean
   status: string
   archived: boolean
   createdAt: number
   updatedAt: number
 }
-export type CreateAntInput = Omit<Ant, 'id' | 'status' | 'archived' | 'fast' | 'permissionMode' | 'createdAt' | 'updatedAt'>
+export type CreateAntInput = Omit<Ant, 'id' | 'status' | 'archived' | 'fast' | 'permissionMode' | 'muted' | 'hidden' | 'createdAt' | 'updatedAt'>
   & Partial<Pick<Ant, 'status' | 'archived' | 'fast' | 'permissionMode'>>
 export type AntPatch = Partial<Omit<Ant, 'id' | 'createdAt' | 'updatedAt'>>
 
-const BOOLEANS = ['archived', 'fast']
+const BOOLEANS = ['archived', 'fast', 'muted', 'hidden']
 
 export function createAnt(db: Db, input: CreateAntInput): Ant {
   const id = newId('ant')
@@ -54,7 +56,7 @@ export function listAnts(db: Db, options: { includeArchived?: boolean } = {}): A
 export function updateAnt(db: Db, id: string, patch: AntPatch): Ant | null {
   patchRow(db, 'ants', id, patch, {
     slug: 'slug', name: 'name', label: 'label', description: 'description', color: 'color',
-    accessory: 'accessory', model: 'model', effort: 'effort', fast: 'fast', permissionMode: 'permission_mode',
+    accessory: 'accessory', model: 'model', effort: 'effort', fast: 'fast', permissionMode: 'permission_mode', muted: 'muted', hidden: 'hidden',
     status: 'status', archived: 'archived',
   }, [], BOOLEANS)
   return getAnt(db, id)

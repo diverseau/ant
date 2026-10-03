@@ -24,6 +24,9 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Activity view (sidebar → Activity): what every ant is doing now, what's waiting on you (with a badge), scheduled and event routines, and recent runs with their outcome, routine and cost. Tap anything to open that chat.
 - Memory you can see (Details → Memory): what each ant remembers and the shared profile of you, entry by entry; edit, add or forget, with the same limits and screening as the ant's memory tool.
 - Message actions: reply (quotes the message into your next one), 👍/👎 (saved; 👎 asks what was wrong and tells the ant), try again, and edit & resend your own messages. Quotes render in chat.
+- Ant templates: Duplicate an ant, Export it as a `.ant.json` file, or Import one (sidebar + → Import an ant…). Profile, skills, routines (not webhooks), rules and instructions travel; history, memory, files, browser logins and secrets never do.
+- Per-ant switches: mute an ant's notifications (approvals still notify) and hide it from the sidebar (+ → Show hidden ants).
+- Routine run history shows each run's API-equivalent cost.
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security

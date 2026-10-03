@@ -181,8 +181,9 @@ export class AntService {
   }
 
   /** Push to paired phones: always, or only when no Ant window is visible anywhere. */
-  alert(p: PushPayload, always = false) {
+  alert(p: PushPayload, always = false, antId?: string) {
     if (!this.push || (!always && this.visibleClients > 0)) return
+    if (antId && R.getAnt(this.db, antId)?.muted) return
     void this.push.send(p).catch(() => {})
   }
 
@@ -213,7 +214,7 @@ export class AntService {
     return ant
   }
 
-  updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'status' | 'model' | 'effort' | 'fast' | 'permissionMode'>>): Ant {
+  updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'status' | 'model' | 'effort' | 'fast' | 'permissionMode' | 'muted' | 'hidden'>>): Ant {
     const row = this.antRow(id)
     if (patch.name && patch.name.trim() !== row.name) {
       const clash = this.findAntByName(patch.name)
@@ -230,6 +231,8 @@ export class AntService {
       ...(patch.effort !== undefined && { effort: patch.effort }),
       ...(patch.fast !== undefined && { fast: patch.fast }),
       ...(patch.permissionMode !== undefined && { permissionMode: patch.permissionMode }),
+      ...(patch.muted !== undefined && { muted: patch.muted }),
+      ...(patch.hidden !== undefined && { hidden: patch.hidden }),
       ...(patch.status !== undefined && { status: patch.status }),
     })!
     if (patch.status === 'paused') this.stopAnt(id)

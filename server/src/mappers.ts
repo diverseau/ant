@@ -16,6 +16,8 @@ export function toAnt(row: R.Ant): Ant {
     effort: row.effort as Effort | '',
     fast: row.fast,
     permissionMode: row.permissionMode as PermissionMode,
+    muted: row.muted,
+    hidden: row.hidden,
   }
 }
 

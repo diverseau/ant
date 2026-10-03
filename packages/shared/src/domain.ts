@@ -12,6 +12,10 @@ export interface Ant {
   effort?: Effort | ''
   fast?: boolean
   permissionMode?: PermissionMode
+  /** No phone or desktop notifications from this ant. */
+  muted?: boolean
+  /** Kept out of the sidebar list (still reachable from search and Activity). */
+  hidden?: boolean
   name: string
   label?: string
   description: string

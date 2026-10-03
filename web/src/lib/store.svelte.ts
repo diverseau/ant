@@ -20,6 +20,8 @@ export const app = $state({
   mode: 'connecting' as Mode,
   /** Phone layout: the chat screen is showing (otherwise the ant list). */
   mobileChat: false,
+  /** Show ants hidden from the sidebar. */
+  showHidden: false,
   /** A message being replied to, per thread (quoted into the next message). */
   replyTo: {} as Record<string, { id: string; author: string; text: string }>,
   online: true,
@@ -76,7 +78,7 @@ export function threadMembers(t: Thread): Ant[] {
 }
 
 export function sortedThreads(): Thread[] {
-  return [...app.threads].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt)
+  return [...app.threads].filter((t) => app.showHidden || t.kind !== 'ant' || !antById(t.refId)?.hidden).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt)
 }
 
 export function preview(t: Thread): string {
@@ -503,7 +505,7 @@ export function renameAnt(id: string, name: string) {
   push(id, { id: uid(), kind: 'system', author: 'system', text: `Renamed to ${n}`, at: Date.now() }, false)
 }
 
-export function updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'model' | 'effort' | 'fast' | 'permissionMode'>>) {
+export function updateAnt(id: string, patch: Partial<Pick<Ant, 'name' | 'label' | 'description' | 'color' | 'accessory' | 'model' | 'effort' | 'fast' | 'permissionMode' | 'muted' | 'hidden'>>) {
   const a = antById(id)
   if (!a) return
   Object.assign(a, patch)
@@ -706,4 +708,32 @@ export function rate(threadId: string, messageId: string, rating: 'up' | 'down' 
   const m = threadById(threadId)?.messages.find((x) => x.id === messageId)
   if (m?.kind === 'text') m.rating = rating
   if (live()) api.rate(messageId, rating).catch(fail)
+}
+
+/** Templates: duplicate an ant, or import one from a .ant.json file. Opens the new ant. */
+export async function duplicateAnt(antId: string) {
+  if (!live()) return notify('Duplicating needs antd running.')
+  try {
+    const r = await api.duplicateAnt(antId)
+    await openNewAnt(r.antId, r.skipped)
+  } catch (err) {
+    fail(err)
+  }
+}
+
+export async function importAntFile(file: File) {
+  try {
+    const template = JSON.parse(await file.text())
+    const r = await api.importAnt(template)
+    await openNewAnt(r.antId, r.skipped)
+  } catch (err) {
+    notify(err instanceof SyntaxError ? 'That file isn’t an Ant template.' : err instanceof Error ? err.message : String(err), 'error')
+  }
+}
+
+async function openNewAnt(antId: string, skipped: string[]) {
+  for (let i = 0; i < 20 && !threadForAnt(antId); i++) await new Promise((r) => setTimeout(r, 50))
+  const t = threadForAnt(antId)
+  if (t) select(t.id)
+  notify(skipped.length ? `Created, but skipped: ${skipped.join('; ')}` : `Created ${antById(antId)?.name ?? 'the ant'}`, skipped.length ? 'warn' : 'info')
 }

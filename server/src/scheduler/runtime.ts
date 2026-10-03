@@ -83,6 +83,7 @@ export class Scheduler {
       startedAt: x.startedAt,
       endedAt: x.endedAt,
       output: x.output,
+      costUsd: x.runId ? Number((this.svc.db.prepare('SELECT cost_usd FROM runs WHERE id = ?').get(x.runId) as { cost_usd?: number } | undefined)?.cost_usd ?? 0) : 0,
     }))
   }
 

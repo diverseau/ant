@@ -95,7 +95,7 @@
     <div class="run" in:rise out:collapse>
       <div class="meta">
         <span class="status" class:succeeded={run.status === 'succeeded'} class:failed={run.status === 'failed'} class:running={run.status === 'running'} class:expired={run.status === 'expired'}>{run.status}</span>
-        <span class="tabular">{duration(run)}</span>
+        <span class="tabular">{duration(run)}{run.costUsd ? ` · ≈$${run.costUsd.toFixed(2)}` : ''}</span>
       </div>
       <time datetime={new Date(run.startedAt).toISOString()} title={new Date(run.startedAt).toLocaleString()}>{started(run.startedAt)} · {routine.tz}</time>
       {#if run.output}
