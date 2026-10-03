@@ -8,10 +8,12 @@
   import { rise } from '../../lib/motion'
   import Globe from '@lucide/svelte/icons/globe'
   import Play from '@lucide/svelte/icons/play'
+  import Maximize2 from '@lucide/svelte/icons/maximize-2'
   import { api } from '../../lib/api'
   import { antById, app, setLease, startComputer, teach, threadById } from '../../lib/store.svelte'
   import FakeScreen from './FakeScreen.svelte'
   import LiveScreen from './LiveScreen.svelte'
+  import ScreenViewer from './ScreenViewer.svelte'
 
   const thread = $derived(threadById(app.selectedId))
   const antId = $derived(
@@ -26,6 +28,7 @@
   const comp = $derived(ant ? app.computers[ant.id] : undefined)
   const control = $derived(comp?.lease === 'user')
   let opened = $state(false)
+  let full = $state(false)
   let teachTitle = $state('')
   let naming = $state(false)
   const teaching = $derived(comp?.teaching)
@@ -37,6 +40,7 @@
     if (app.mode !== 'live' || !ant) return
     const id = ant.id
     opened = false
+    full = false
     api.computer(id).then((s) => (app.computers[id] = s)).catch(() => {})
   })
 
@@ -59,11 +63,17 @@
         <div class="title">{ant.name}'s computer</div>
         <div class="sub">{control ? 'You are in control' : comp?.running ? (ant.status === 'working' ? 'Working' : 'Ready') : 'Browser asleep'}</div>
       </div>
+      {#if comp?.running || opened}
+        <button class="icon-btn expand" aria-label="Full screen" title="Full screen (or double-click the screen)" onclick={() => (full = true)} in:rise={{ y: 2, duration: 200 }}>
+          <Maximize2 size={16} />
+        </button>
+      {/if}
     </div>
 
     {#if comp?.running || opened}
       <div class="urlbar"><Globe size={13} /><span>{comp?.url && comp.url !== 'about:blank' ? comp.url.replace(/^https?:\/\//, '') : 'New tab'}</span></div>
-      <div class="screen-wrap" class:control>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="screen-wrap" class:control ondblclick={() => !control && (full = true)}>
         <LiveScreen antId={ant.id} {control} />
         {#if control}
           <div class="banner" transition:slide={{ duration: 240, easing: cubicOut }}>
@@ -108,6 +118,10 @@
         </div>
         <p>Logins you make here stay in {ant.name}'s own browser profile, so it can keep using them.</p>
       </div>
+    {/if}
+
+    {#if full}
+      <ScreenViewer {ant} {comp} onclose={() => (full = false)} />
     {/if}
 
     {#if browserSteps.length}
@@ -191,6 +205,20 @@
   .grow {
     flex: 1;
     min-width: 0;
+  }
+
+  .expand {
+    width: 30px;
+    height: 30px;
+    flex: none;
+  }
+
+  .expand :global(svg) {
+    transition: transform var(--dur) var(--ease-spring);
+  }
+
+  .expand:hover :global(svg) {
+    transform: scale(1.12);
   }
 
   .rec {
