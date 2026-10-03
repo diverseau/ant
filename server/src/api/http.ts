@@ -16,6 +16,7 @@ import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
+import { LogoCache } from '../connectors/logos.ts'
 
 const WEB_DIST = fileURLToPath(new URL('../../../web/dist/', import.meta.url))
 const ALLOWED_ORIGINS = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -453,6 +454,13 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     if (scope === 'colony') for (const a of R.listAnts(svc.db)) svc.skills.sync(svc.pathsFor(a.id).folder)
     svc.emit({ type: 'skills.updated' })
     return c.body(null, 204)
+  })
+
+  const logos = new LogoCache(svc.cfg.dataDir)
+  app.get('/api/logos/:domain', async (c) => {
+    const png = await logos.get(c.req.param('domain'))
+    if (!png) return c.body(null, 404, { 'cache-control': 'no-store' })
+    return c.body(new Uint8Array(png), 200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=604800' })
   })
 
   app.get('/api/usage', (c) => {

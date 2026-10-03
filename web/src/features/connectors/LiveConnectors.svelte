@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { logoDomain } from '@ant/shared'
+  import Logo from '../../lib/ui/Logo.svelte'
   import ExternalLink from '@lucide/svelte/icons/external-link'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import Plus from '@lucide/svelte/icons/plus'
@@ -117,7 +119,7 @@
     {#each view.claudeAi as c (c.key)}
       <div class="card" in:rise>
         <div class="row">
-          <span class="logo">{c.name[0]}</span>
+          <Logo name={c.name} domain={logoDomain(c.name, { guess: true })} />
           <span class="name">{c.name}</span>
           {#if c.status === 'connected'}<span class="pill ok">Connected</span>
           {:else if c.status === 'needs-auth'}<a class="pill warn" href="https://claude.ai/settings/connectors" target="_blank" rel="noreferrer">Connect on claude.ai</a>
@@ -138,7 +140,7 @@
     {#each view.custom as c (c.id)}
       <div class="card" in:rise out:slide={{ duration: 200 }}>
         <div class="row">
-          <span class="logo">{c.name[0].toUpperCase()}</span>
+          <Logo name={c.name} domain={logoDomain(c.name, { url: c.transport === 'http' ? c.url : undefined })} />
           <span class="name">{c.name}</span>
           <code class="sub">{c.transport === 'http' ? c.url : [c.command, ...(c.args ?? [])].join(' ')}</code>
           <button class="icon-btn" aria-label="Remove {c.name}" onclick={() => connectorsDo(() => api.deleteConnector(c.id), setView, 'Removed')}><Trash size={14} /></button>
@@ -215,7 +217,7 @@
       {@const st = app.channels.find((c) => c.kind === k.kind)}
       <div class="card">
         <div class="row">
-          <span class="logo">{k.label[0]}</span>
+          <Logo name={k.label} domain={logoDomain(k.label)} />
           <span class="name">{k.label}</span>
           {#if st?.connected}<span class="pill ok">Connected{st.botName ? ` as ${st.botName}` : ''}</span>
           {:else if st?.error}<span class="pill err" title={st.error}>{st.error}</span>

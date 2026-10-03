@@ -10,6 +10,7 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Permission modes: Supervised, Auto-accept edits (the previous behaviour, still the default), Auto (`--permission-mode auto`), Full access (`bypassPermissions`, home-wide sandbox writes, no unsandboxed escape).
 - Changes apply on the ant's next turn; a busy ant restarts once its current turn ends.
 - Full-screen view of an ant's computer (expand button or double-click): watch without taking over, take over from there if you want, Esc to leave.
+- Real logos for connectors and chat channels, downloaded once by antd from Google's favicon service and cached in Ant's data folder (letter tile when a site has none).
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security
