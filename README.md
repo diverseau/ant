@@ -32,7 +32,8 @@ For an always-on server, see [docs/self-hosting.md](docs/self-hosting.md).
 - **Remember** what matters (its own notes plus a shared profile of you).
 - **Work together** in colonies: @mention an ant, or let the lead delegate. Ants can message each other, with a loop guard.
 - **Connectors**: your claude.ai connectors (Gmail, Calendar…) and custom MCP servers, switchable per ant. **Secrets** are encrypted and injected only into the ants you choose.
-- **Chat apps**: talk to your ants from Telegram or Discord (allow-listed users only).
+- **Chat apps**: talk to your ants from Telegram, Discord or Slack (allow-listed users only).
+- **Dictation**: speak into the composer; speech is transcribed on your computer (voxtype).
 
 ## Safety model
 

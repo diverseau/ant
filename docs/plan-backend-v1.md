@@ -1,6 +1,6 @@
 # Ant — Backend Plan (v1)
 
-Status: proposal, 2026-10-03. Companion to `plan-frontend-v1.md`. Nothing here is built yet.
+Status: implemented in 0.9.0 (2026-10-03); see the status note at the end and `CHANGELOG.md`. Companion to `plan-frontend-v1.md`.
 
 ## 0. Decisions (locked)
 
@@ -463,7 +463,7 @@ Not lifted: the agent loop, provider adapters, Hermes's own approval runtime, br
 
 ## 17. Milestones
 
-**Status (2026-10-03):** 0.2.0–0.9.0 are implemented and tested (see `CHANGELOG.md`), plus Teach a task (browser-only) and channels (Telegram/Discord backend). Still open: Connectors/Secrets/Channels UI (in progress), colony management UI (in progress), Docker/self-hosting (in progress), Slack adapter, full-desktop computer use (Xvnc + cua-driver), helper ants. Deviations from this plan: Chromium runs headless with a CDP screencast instead of Xvnc/noVNC (no extra system packages; full desktop deferred); generated settings live in antd's data dir and are passed with `--settings` (spike 3b).
+**Status (2026-10-03):** 0.2.0–0.9.0 are implemented and tested (see `CHANGELOG.md`), plus Teach a task (browser-only), the Connectors/Secrets/Channels UI, colony management, helper ants, Docker/self-hosting files and channels (Telegram, Discord, Slack). Still open: full-desktop computer use (Xvnc + cua-driver). Later work is tracked in `docs/audit-vs-reference.md`. Deviations from this plan: Chromium runs headless with a CDP screencast instead of Xvnc/noVNC (no extra system packages; full desktop deferred); generated settings live in antd's data dir and are passed with `--settings` (spike 3b).
 
 
 | Version | Deliverable | Done when |

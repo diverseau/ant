@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // The `ant` MCP server: spawned by each ant's `claude` process, forwards every tool
 // call to antd over its local socket. Holds no state of its own.
+import { readFileSync } from 'node:fs'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -14,7 +15,8 @@ if (!socket || !token) {
 }
 
 const antd = new AntdClient(socket, token)
-const server = new McpServer({ name: 'ant', version: '0.9.0' })
+const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+const server = new McpServer({ name: 'ant', version })
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] })
 const call = async (method: string, params: Record<string, unknown>) => {

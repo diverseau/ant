@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -37,7 +38,7 @@ export function loadConfig(env = process.env): Config {
     maxBusy: Number(env.ANT_MAX_BUSY ?? 3),
     idleMs: Number(env.ANT_IDLE_MS ?? 10 * 60_000),
     defaultModel: env.ANT_MODEL ?? 'sonnet',
-    version: '0.9.0',
+    version: (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version,
     selfPorts: [...new Set([Number(env.ANT_PORT ?? 7420), ...(env.ANT_WEB_PORTS ?? '5173,5180,5181').split(',').map(Number)])].filter((n) => n > 0),
   }
 }
