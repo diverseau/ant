@@ -1,11 +1,13 @@
 // Tiny, safe markdown subset for agent messages: paragraphs, headings, "- " and "1." lists,
-// quotes, fenced code, tables, **bold**, `code` and @Mentions. Produces data, never HTML strings.
+// quotes, fenced code, tables, **bold**, *italic*, `code`, links and @Mentions. Produces data, never HTML strings.
 import type { Ant } from './types'
 
 export type Inline =
   | { t: 'text'; v: string }
   | { t: 'bold'; v: string }
+  | { t: 'em'; v: string }
   | { t: 'code'; v: string }
+  | { t: 'link'; v: string; href: string }
   | { t: 'mention'; ant: Ant }
   | { t: 'tag'; v: string }
 
@@ -20,25 +22,68 @@ export type Block =
   | { t: 'pre'; v: string }
   | { t: 'table'; align: Align[]; head: Inline[][]; rows: Inline[][][] }
 
-// A /skill tag only counts at the very start of a message (how skills are invoked).
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|@([A-Za-z][\w-]*)|(^)(\/[\w-]+)(?=\s|$)/g
+// Earliest match wins, so a URL swallows any @ or _ inside it. A /skill tag only counts at the
+// very start of a message (how skills are invoked).
+const INLINE = new RegExp(
+  [
+    /`(?<code>[^`]+)`/,
+    /\[(?<label>[^\]\n]+)\]\((?<href>(?:[^()\s]|\([^()\s]*\))+)\)/,
+    /(?<url>https?:\/\/[^\s<>]+)/,
+    /\*\*(?<bold>.+?)\*\*/,
+    /(?<![\w*])\*(?![\s*])(?<em>[^*\n]+?)\*(?![\w*])/,
+    /(?<![\w_])_(?![\s_])(?<em2>[^_\n]+?)_(?![\w_])/,
+    /@(?<mention>[A-Za-z][\w-]*)/,
+    /^(?<tag>\/[\w-]+)(?=\s|$)/,
+  ]
+    .map((r) => r.source)
+    .join('|'),
+  'g',
+)
+
+// Only web and mail links become clickable; anything else (javascript:, file:) stays text.
+export function safeHref(href: string): string | null {
+  try {
+    const u = new URL(href)
+    return ['http:', 'https:', 'mailto:'].includes(u.protocol) ? u.href : null
+  } catch {
+    return null
+  }
+}
 
 export function inline(src: string, ants: Ant[]): Inline[] {
   const out: Inline[] = []
+  const text = (v: string) => {
+    const prev = out[out.length - 1]
+    if (prev?.t === 'text') prev.v += v
+    else if (v) out.push({ t: 'text', v })
+  }
   let last = 0
   for (const m of src.matchAll(INLINE)) {
-    let start = m.index!
-    if (m[5]) start += m[4].length
-    if (start > last) out.push({ t: 'text', v: src.slice(last, start) })
-    if (m[1] !== undefined) out.push({ t: 'bold', v: m[1] })
-    else if (m[2] !== undefined) out.push({ t: 'code', v: m[2] })
-    else if (m[3] !== undefined) {
-      const ant = ants.find((a) => a.name.toLowerCase() === m[3].toLowerCase())
-      out.push(ant ? { t: 'mention', ant } : { t: 'text', v: m[0] })
-    } else if (m[5]) out.push({ t: 'tag', v: m[5] })
-    last = m.index! + m[0].length
+    const g = m.groups!
+    const raw = m[0]
+    let end = m.index! + raw.length
+    text(src.slice(last, m.index))
+    if (g.code !== undefined) out.push({ t: 'code', v: g.code })
+    else if (g.label !== undefined) {
+      const href = safeHref(g.href)
+      out.push(href ? { t: 'link', v: g.label.replace(/\*\*|`/g, ''), href } : { t: 'text', v: raw })
+    } else if (g.url !== undefined) {
+      // Sentence punctuation after a bare URL isn't part of it; a ")" only is when it closes a "(".
+      let url = g.url.replace(/[.,;:!?'"]+$/, '')
+      while (url.endsWith(')') && (url.match(/\(/g)?.length ?? 0) < (url.match(/\)/g)?.length ?? 0)) url = url.slice(0, -1)
+      end = m.index! + url.length
+      const href = safeHref(url)
+      out.push(href ? { t: 'link', v: url, href } : { t: 'text', v: url })
+    } else if (g.bold !== undefined) out.push({ t: 'bold', v: g.bold })
+    else if (g.em !== undefined || g.em2 !== undefined) out.push({ t: 'em', v: g.em ?? g.em2 })
+    else if (g.mention !== undefined) {
+      const ant = ants.find((a) => a.name.toLowerCase() === g.mention.toLowerCase())
+      if (ant) out.push({ t: 'mention', ant })
+      else text(raw)
+    } else if (g.tag !== undefined) out.push({ t: 'tag', v: g.tag })
+    last = end
   }
-  if (last < src.length) out.push({ t: 'text', v: src.slice(last) })
+  text(src.slice(last))
   return out
 }
 

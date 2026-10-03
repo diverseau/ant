@@ -6,11 +6,17 @@
   let { text, streaming = false }: { text: string; streaming?: boolean } = $props()
 
   const blocks = $derived(parse(text, app.ants))
+
+  // A bare URL shows without its scheme, shortened; the full address is in the tooltip.
+  function short(url: string) {
+    const s = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+    return s.length > 52 ? s.slice(0, 50) + '…' : s
+  }
 </script>
 
 {#snippet inl(parts: Inline[], last: boolean)}
   {#each parts as p}
-    {#if p.t === 'text'}{#each p.v.split('\n') as line, li}{#if li}<br />{/if}{line}{/each}{:else if p.t === 'bold'}<strong>{p.v}</strong>{:else if p.t === 'code'}<code>{p.v}</code>{:else if p.t === 'tag'}<span class="tag">{p.v}</span>{:else if p.t === 'mention'}<button class="mention" onclick={() => selectAnt(p.ant.id)}><Ant color={p.ant.color} size={17} />{p.ant.name}</button>{/if}
+    {#if p.t === 'text'}{#each p.v.split('\n') as line, li}{#if li}<br />{/if}{line}{/each}{:else if p.t === 'bold'}<strong>{p.v}</strong>{:else if p.t === 'em'}<em>{p.v}</em>{:else if p.t === 'code'}<code>{p.v}</code>{:else if p.t === 'link'}<a href={p.href} target="_blank" rel="noopener noreferrer" title={p.href}>{p.v === p.href || p.v + '/' === p.href ? short(p.v) : p.v}</a>{:else if p.t === 'tag'}<span class="tag">{p.v}</span>{:else if p.t === 'mention'}<button class="mention" onclick={() => selectAnt(p.ant.id)}><Ant color={p.ant.color} size={17} />{p.ant.name}</button>{/if}
   {/each}{#if last && streaming}<span class="caret"></span>{/if}
 {/snippet}
 
@@ -166,6 +172,18 @@
 
   strong {
     font-weight: 600;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    text-underline-offset: 0.18em;
+    transition: text-decoration-color var(--dur-fast);
+  }
+
+  a:hover {
+    text-decoration-color: var(--accent);
   }
 
   code {
