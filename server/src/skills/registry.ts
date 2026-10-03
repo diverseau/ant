@@ -3,7 +3,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SkillView } from '@ant/shared'
-import { deleteSkill, listSkills, saveSkill, type SaveSkillInput } from './store.ts'
+import { deleteSkill, listSkills, readSkill, saveSkill, type SaveSkillInput } from './store.ts'
 
 /** Marks a skill folder in an ant that was copied from the colony library. */
 const SHARED_MARK = '.ant-shared'
@@ -38,6 +38,24 @@ export class SkillRegistry {
 
   remove(folder: string, name: string, scope: 'ant' | 'colony'): boolean {
     return deleteSkill(scope === 'colony' ? this.sharedDir : this.antDir(folder), name)
+  }
+
+  read(folder: string, name: string, scope: 'ant' | 'colony') {
+    const s = readSkill(scope === 'colony' ? this.sharedDir : this.antDir(folder), name)
+    return s && { ...s, scope }
+  }
+
+  /** Move an ant's own skill into the colony library, keeping its supporting files. */
+  share(folder: string, name: string): { ok: true } | { ok: false; errors: string[] } {
+    const src = join(this.antDir(folder), name)
+    const s = readSkill(this.antDir(folder), name)
+    if (!s) return { ok: false, errors: ['No such skill'] }
+    mkdirSync(this.sharedDir, { recursive: true })
+    const dest = join(this.sharedDir, name)
+    if (existsSync(dest)) return { ok: false, errors: [`The colony already has a skill called ${name}.`] }
+    cpSync(src, dest, { recursive: true })
+    rmSync(src, { recursive: true, force: true })
+    return { ok: true }
   }
 
   /** Copy colony skills into an ant (own skills of the same name win); drop stale copies. */

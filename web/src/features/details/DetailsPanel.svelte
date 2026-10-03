@@ -23,6 +23,7 @@
   import Switch from '../../lib/ui/Switch.svelte'
   import RoutineEditor from '../routines/RoutineEditor.svelte'
   import RuleForm from './RuleForm.svelte'
+  import SkillEditor from './SkillEditor.svelte'
   import RoutineRuns from '../routines/RoutineRuns.svelte'
 
   const thread = $derived(threadById(app.selectedId))
@@ -158,6 +159,7 @@
     await api.deleteRule(id).catch(() => {})
   }
   let addingRule = $state(false)
+  let skillOpen = $state<{ name: string; scope: 'ant' | 'colony' } | 'new' | null>(null)
   const reloadRules = () => ant && api.rules(ant.id).then((r) => (liveRules = r)).catch(() => {})
   const MODE_LABEL = { allow: 'Allowed', ask: 'Ask first', handoff: 'Hand off', deny: 'Never' } as const
 
@@ -198,14 +200,15 @@
     <section>
       <h3><Sparkles size={13} /> Skills</h3>
       {#each app.mode === 'live' ? app.skills : mockSkills.slice(0, 3) as s}
-        <div class="item">
+        <button class="item skill" disabled={app.mode !== 'live'} onclick={() => (skillOpen = { name: s.name, scope: 'scope' in s && s.scope === 'colony' ? 'colony' : 'ant' })}>
           <span class="mono">/{s.name}</span>
           <span class="sub">{s.description}</span>
           {#if 'scope' in s && s.scope === 'colony'}<span class="scope">colony</span>{/if}
-        </div>
+        </button>
       {:else}
-        <p class="hint">No skills yet. When {ant.name} figures out a repeatable process, ask it to save it as a skill.</p>
+        <p class="hint">No skills yet. When {ant.name} figures out a repeatable process, ask it to save it as a skill, or write one yourself.</p>
       {/each}
+      {#if app.mode === 'live'}<button class="btn btn-ghost add-rule" onclick={() => (skillOpen = 'new')}><Plus size={13} /> New skill</button>{/if}
     </section>
 
     <section>
@@ -372,6 +375,7 @@
   {/if}
 </div>
 
+{#if skillOpen && ant}<SkillEditor antId={ant.id} antName={ant.name} threadId={threadForAnt(ant.id)?.id ?? ''} skill={skillOpen === 'new' ? undefined : skillOpen} onclose={() => (skillOpen = null)} />{/if}
 {#if editor}<RoutineEditor antId={editor.antId} routine={editor.routine} onclose={() => editor = null} />{/if}
 
 <style>
@@ -750,5 +754,17 @@
     white-space: nowrap;
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+
+  button.item.skill {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border-radius: var(--r-md);
+    transition: background var(--dur-fast);
+  }
+
+  button.item.skill:hover:not(:disabled) {
+    background: var(--bg-hover);
   }
 </style>

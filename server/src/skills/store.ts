@@ -143,6 +143,30 @@ export function saveSkill(dir: string, input: SaveSkillInput): SaveResult {
   }
 }
 
+/** One skill's SKILL.md (parsed) and the names of its supporting files. */
+export function readSkill(dir: string, name: string): { name: string; description: string; body: string; files: string[] } | null {
+  if (!validName(name)) return null
+  try {
+    const target = join(resolve(dir), name)
+    safeDirectories(target)
+    const doc = parseSkill(readText(join(target, 'SKILL.md'), 1_048_576)).doc
+    if (!doc || doc.name !== name) return null
+    const files: string[] = []
+    const walkNames = (d: string, rel: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.name.startsWith('.')) continue
+        const r = rel ? `${rel}/${e.name}` : e.name
+        if (e.isDirectory()) walkNames(join(d, e.name), r)
+        else if (e.isFile() && r !== 'SKILL.md') files.push(r)
+      }
+    }
+    walkNames(target, '')
+    return { name, description: doc.description, body: doc.body, files: files.sort() }
+  } catch {
+    return null
+  }
+}
+
 export function listSkills(dir: string): Array<{ name: string; description: string; path: string }> {
   const skills: Array<{ name: string; description: string; path: string }> = []
   const root = resolve(dir)

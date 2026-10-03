@@ -85,6 +85,11 @@ export const api = {
   setChannel: (kind: string, cfg: { enabled: boolean; tokenSecret: string; allowUsers: string[] }) => req<ChannelStatus[]>('PUT', `/api/channels/${kind}`, cfg),
   deleteChannel: (kind: string) => req<ChannelStatus[]>('DELETE', `/api/channels/${kind}`),
   skills: (antId: string) => req<SkillView[]>('GET', `/api/ants/${antId}/skills`),
+  skill: (antId: string, name: string, scope: 'ant' | 'colony') =>
+    req<{ name: string; description: string; body: string; files: string[]; scope: 'ant' | 'colony' }>('GET', `/api/ants/${antId}/skills/${name}?scope=${scope}`),
+  saveSkill: (antId: string, name: string, s: { description: string; body: string; scope: 'ant' | 'colony' }) => req<{ warnings: string[] }>('PUT', `/api/ants/${antId}/skills/${name}`, s),
+  shareSkill: (antId: string, name: string) => req<void>('POST', `/api/ants/${antId}/skills/${name}/share`),
+  deleteSkill: (antId: string, name: string, scope: 'ant' | 'colony') => req<void>('DELETE', `/api/ants/${antId}/skills/${name}?scope=${scope}`),
   search: (q: string) => req<SearchHit[]>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   settings: (patch: Partial<Settings>) => req<Settings>('PATCH', '/api/settings', patch),
   computer: (antId: string) => req<ComputerState>('GET', `/api/ants/${antId}/computer`),

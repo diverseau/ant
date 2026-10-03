@@ -599,6 +599,34 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   })
 
   app.get('/api/ants/:id/skills', (c) => c.json(svc.skills.list(svc.pathsFor(svc.antRow(c.req.param('id')).id).folder)))
+  // Skill manager (Details → Skills): read, write, share with the colony. Ants pick up changes on
+  // their next session.
+  const skillChanged = (scope: 'ant' | 'colony') => {
+    if (scope === 'colony') for (const a of R.listAnts(svc.db)) svc.skills.sync(svc.pathsFor(a.id).folder)
+    svc.emit({ type: 'skills.updated' })
+    svc.refreshIdle()
+  }
+  app.get('/api/ants/:id/skills/:name', (c) => {
+    const folder = svc.pathsFor(svc.antRow(c.req.param('id')).id).folder
+    const s = svc.skills.read(folder, c.req.param('name'), c.req.query('scope') === 'colony' ? 'colony' : 'ant')
+    if (!s) throw new HttpError(404, 'No such skill')
+    return c.json(s)
+  })
+  app.put('/api/ants/:id/skills/:name', async (c) => {
+    const folder = svc.pathsFor(svc.antRow(c.req.param('id')).id).folder
+    const b = await body(c, z.object({ description: z.string().min(1).max(1024), body: z.string().min(1).max(60_000), scope: z.enum(['ant', 'colony']) }))
+    const r = svc.skills.save(folder, { name: c.req.param('name'), description: b.description, body: b.body }, b.scope)
+    if (!r.ok) throw new HttpError(400, r.errors.join(' '))
+    skillChanged(b.scope)
+    return c.json({ warnings: r.warnings })
+  })
+  app.post('/api/ants/:id/skills/:name/share', (c) => {
+    const folder = svc.pathsFor(svc.antRow(c.req.param('id')).id).folder
+    const r = svc.skills.share(folder, c.req.param('name'))
+    if (!r.ok) throw new HttpError(400, r.errors.join(' '))
+    skillChanged('colony')
+    return c.body(null, 204)
+  })
   app.delete('/api/ants/:id/skills/:name', (c) => {
     const id = svc.antRow(c.req.param('id')).id
     const scope = c.req.query('scope') === 'colony' ? 'colony' : 'ant'
