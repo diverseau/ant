@@ -6,7 +6,7 @@ import { antDataDir } from '../config.ts'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createNodeWebSocket } from '@hono/node-ws'
-import type { AntEvent, ApprovalDecision, CreateAntInput, Health } from '@ant/shared'
+import type { AntEvent, ApprovalDecision, CreateAntInput, Health, UsageWindows } from '@ant/shared'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { Broker } from '../broker.ts'
@@ -15,6 +15,7 @@ import type { ChannelHub } from '../channels/hub.ts'
 import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
+import { probeUsage } from '../usage/probe.ts'
 
 const WEB_DIST = fileURLToPath(new URL('../../../web/dist/', import.meta.url))
 const ALLOWED_ORIGINS = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -458,6 +459,21 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)
     return c.json({ windows: R.getSetting(svc.db, 'usage.windows', null), days: R.usageRange(svc.db, from, to) })
+  })
+
+  // Refresh button: one /usage probe at a time, shared by concurrent clicks.
+  let probing: Promise<UsageWindows> | null = null
+  app.post('/api/usage/refresh', async (c) => {
+    probing ??= probeUsage(svc.cfg, R.getSetting<UsageWindows | null>(svc.db, 'usage.windows', null)).finally(() => (probing = null))
+    let usage: UsageWindows
+    try {
+      usage = await probing
+    } catch (err) {
+      throw new HttpError(502, err instanceof Error ? err.message : 'Usage check failed')
+    }
+    R.setSetting(svc.db, 'usage.windows', usage)
+    svc.emit({ type: 'usage', usage })
+    return c.json(usage)
   })
 
   app.get(

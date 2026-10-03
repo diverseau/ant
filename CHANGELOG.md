@@ -9,6 +9,7 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Effort (Low to Max, defaulting to the model's own) and Fast mode on Opus. When Claude Code serves a turn at standard speed anyway, Ant says why (e.g. extra usage is off for the account).
 - Permission modes: Supervised, Auto-accept edits (the previous behaviour, still the default), Auto (`--permission-mode auto`), Full access (`bypassPermissions`, home-wide sandbox writes, no unsandboxed escape).
 - Changes apply on the ant's next turn; a busy ant restarts once its current turn ends.
+- Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security
 - In Auto and Full access the PreToolUse floors also deny WebFetch/browser navigation to Ant's own ports and send connector messages through the approval card, since those modes skip the permission prompt.

@@ -1,8 +1,10 @@
 <script lang="ts">
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import X from '@lucide/svelte/icons/x'
   import { onMount } from 'svelte'
   import Ant from '../../lib/ant/Ant.svelte'
-  import { app, antById } from '../../lib/store.svelte'
+  import type { UsageWindows } from '@ant/shared'
+  import { app, antById, notify } from '../../lib/store.svelte'
   import Modal from '../../lib/ui/Modal.svelte'
 
   interface DailyUsage {
@@ -68,6 +70,36 @@
     return () => controller.abort()
   })
 
+  // Claude Code's /usage is a local command: refreshing spends no usage.
+  let refreshing = $state(false)
+  async function refresh() {
+    if (refreshing) return
+    if (app.mode !== 'live') {
+      notify('Usage needs antd running.')
+      return
+    }
+    refreshing = true
+    try {
+      const r = await fetch('/api/usage/refresh', { method: 'POST' })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error ?? 'Usage check failed')
+      app.usage = body as UsageWindows
+      now = Date.now()
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Usage check failed', 'warn')
+    } finally {
+      refreshing = false
+    }
+  }
+
+  function updatedAgo(at: number) {
+    const minutes = Math.floor((now - at) / 60_000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`
+  }
+
   function utilization(value: number) {
     return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
   }
@@ -91,7 +123,15 @@
     <h2>Claude subscription usage</h2>
     <button class="icon-btn" aria-label="Close usage" onclick={() => (app.overlay = null)}><X size={18} /></button>
   </div>
-  <p class="lede">Ants use your Claude subscription. These numbers come from Claude Code.</p>
+  <div class="lede-row">
+    <p class="lede">Ants use your Claude subscription. These numbers come from Claude Code.</p>
+    <div class="refresh">
+      {#if app.usage?.updatedAt}<span class="updated tabular" title="Last checked {new Date(app.usage.updatedAt).toLocaleTimeString()}">{refreshing ? 'Checking…' : updatedAgo(app.usage.updatedAt)}</span>{/if}
+      <button class="icon-btn refresh-btn" class:spinning={refreshing} aria-label="Refresh usage" title="Refresh usage" disabled={refreshing} onclick={refresh}>
+        <RefreshCw size={15} />
+      </button>
+    </div>
+  </div>
 
   <div class="windows tabular">
     {#if app.usage === null}
@@ -179,7 +219,62 @@
     font-weight: 500;
   }
 
+  .lede-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 0 16px 0 0;
+  }
+
+  .refresh {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    margin-bottom: 12px;
+  }
+
+  .updated {
+    min-width: 62px;
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+
+  .refresh-btn {
+    width: 30px;
+    height: 30px;
+    transition:
+      background var(--dur-fast),
+      color var(--dur-fast),
+      transform var(--dur-fast) var(--ease-out);
+  }
+
+  .refresh-btn:active:not(:disabled) {
+    transform: scale(0.88);
+  }
+
+  .refresh-btn :global(svg) {
+    transition: transform var(--dur-slow) var(--ease-spring);
+  }
+
+  .refresh-btn:hover:not(:disabled) :global(svg) {
+    transform: rotate(45deg);
+  }
+
+  .refresh-btn.spinning :global(svg) {
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .lede {
+    flex: 1;
+    min-width: 0;
     padding: 8px 22px 20px;
     font-family: var(--font-body);
     font-size: var(--text-sm);
