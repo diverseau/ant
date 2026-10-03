@@ -16,12 +16,14 @@ import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
+import { Auth, LOCAL_HOSTS, SESSION_COOKIE, hostOf } from '../auth/auth.ts'
+import { remoteStatus, setTailscale } from '../auth/remote.ts'
+import { deleteCookie, setCookie } from 'hono/cookie'
 import { LogoCache } from '../connectors/logos.ts'
 import { MAX_AUDIO_BYTES, transcribe } from '../dictation/transcribe.ts'
 
 const WEB_DIST = fileURLToPath(new URL('../../../web/dist/', import.meta.url))
 const ALLOWED_ORIGINS = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
-const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 
 const colors = z.enum(['coral', 'purple', 'yellow', 'green', 'blue'])
 const accessories = z.enum(['none', 'satchel', 'leaf', 'wrench', 'glasses'])
@@ -45,16 +47,32 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   const app = new Hono()
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
 
-  // Local-only service: refuse cross-site requests (Origin) and DNS rebinding (Host).
-  // ANT_ALLOWED_HOSTS adds names for remote setups (e.g. a Tailscale hostname).
-  const extraHosts = (process.env.ANT_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
+  // Refuse cross-site requests (Origin) and DNS rebinding (Host). Remote host names come from
+  // ANT_ALLOWED_HOSTS or Settings → Remote access. Then: this computer is trusted; every other
+  // device needs a paired session (auth/auth.ts).
+  const auth = new Auth(svc.db)
+  const deviceOf = new WeakMap<Request, string>()
+  const OPEN = new Set(['/api/auth/status', '/api/auth/pair'])
   app.use('*', async (c, next) => {
     const origin = c.req.header('origin')
-    const host = (c.req.header('host') ?? '').toLowerCase().replace(/:\d+$/, '')
+    const host = hostOf(c)
+    const extraHosts = auth.allowedHosts()
     const hostOk = LOCAL_HOSTS.has(host) || extraHosts.includes(host)
     // Webhooks are called by other machines when Ant is exposed; they carry their own key.
     if (!hostOk && !c.req.path.startsWith('/hooks/')) return c.json({ error: 'Forbidden host' }, 403)
-    if (origin && !ALLOWED_ORIGINS.test(origin) && !extraHosts.some((h) => origin.toLowerCase().includes(`//${h}`))) return c.json({ error: 'Forbidden origin' }, 403)
+    if (origin && !ALLOWED_ORIGINS.test(origin)) {
+      let originHost = ''
+      try {
+        originHost = new URL(origin).hostname.toLowerCase()
+      } catch {}
+      if (!extraHosts.includes(originHost)) return c.json({ error: 'Forbidden origin' }, 403)
+    }
+    const p = c.req.path
+    if ((p.startsWith('/api/') || p === '/ws' || p.startsWith('/ws/')) && !OPEN.has(p) && !auth.trusted(c)) {
+      const d = auth.device(c)
+      if (!d) return c.json({ error: 'Pair this device to use Ant', code: 'auth' }, 401)
+      deviceOf.set(c.req.raw, d.id)
+    }
     await next()
   })
 
@@ -68,6 +86,51 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
   const body = async <T>(c: Context, schema: z.ZodType<T>): Promise<T> => schema.parse(await c.req.json().catch(() => ({})))
 
   app.get('/api/health', (c) => c.json(health()))
+
+  /* ---------- devices and remote access ---------- */
+
+  app.get('/api/auth/status', (c) => {
+    const trusted = auth.trusted(c)
+    const d = trusted ? null : auth.device(c)
+    return c.json({ trusted, authenticated: trusted || !!d, device: d ? { id: d.id, name: d.name } : null })
+  })
+
+  app.post('/api/auth/pair', async (c) => {
+    const b = await body(c, z.object({ code: z.string().max(40), name: z.string().max(60).optional() }))
+    const r = auth.pair(b.code, b.name ?? '', c.req.header('user-agent') ?? '')
+    if ('error' in r) return c.json({ error: r.error }, r.status)
+    setCookie(c, SESSION_COOKIE, r.cookieValue, auth.cookieOptions(c))
+    svc.emit({ type: 'notice', level: 'info', text: `${r.device.name} was paired with Ant.` })
+    return c.json({ device: { id: r.device.id, name: r.device.name } })
+  })
+
+  app.post('/api/auth/logout', (c) => {
+    const id = deviceOf.get(c.req.raw)
+    if (id) auth.revoke(id)
+    deleteCookie(c, SESSION_COOKIE, { path: '/' })
+    return c.body(null, 204)
+  })
+
+  app.post('/api/auth/pairing-code', (c) => c.json({ ...auth.newPairingCode(), urls: remoteStatus(svc, auth).urls }))
+
+  app.get('/api/auth/devices', (c) => {
+    const current = deviceOf.get(c.req.raw)
+    return c.json(R.listDevices(svc.db).map((d) => ({ id: d.id, name: d.name, userAgent: d.userAgent, createdAt: d.createdAt, lastSeenAt: d.lastSeenAt, current: d.id === current })))
+  })
+
+  app.delete('/api/auth/devices/:id', (c) => {
+    if (!auth.revoke(c.req.param('id'))) throw new HttpError(404, 'No such device')
+    return c.body(null, 204)
+  })
+
+  app.get('/api/remote', (c) => c.json(remoteStatus(svc, auth)))
+
+  app.post('/api/remote/tailscale', async (c) => {
+    if (!auth.trusted(c)) throw new HttpError(403, 'Change remote access from the computer Ant runs on')
+    const b = await body(c, z.object({ enabled: z.boolean() }))
+    await setTailscale(svc, b.enabled)
+    return c.json(remoteStatus(svc, auth))
+  })
   app.get('/api/bootstrap', (c) => c.json(svc.bootstrap(health())))
 
   app.post('/api/ants', async (c) => c.json(svc.createAnt((await body(c, createAnt)) as CreateAntInput), 201))
@@ -220,9 +283,12 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     '/ws/ants/:id/screen',
     upgradeWebSocket((c) => {
       const antId = c.req.param('id') ?? ''
+      const deviceId = deviceOf.get(c.req.raw)
       let stop: (() => void) | null = null
+      let untrack = () => {}
       return {
         async onOpen(_e, ws) {
+          untrack = auth.trackSocket(deviceId, () => ws.close(4001, 'Device removed'))
           try {
             const id = svc.antRow(antId).id
             stop = await svc.computers.watch(id, svc.pathsFor(id).folder, svc.cdpPort(id), (f) => ws.send(JSON.stringify({ type: 'frame', ...f })))
@@ -239,6 +305,7 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
         },
         onClose() {
           stop?.()
+          untrack()
         },
       }
     }),
@@ -500,13 +567,18 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
 
   app.get(
     '/ws',
-    upgradeWebSocket(() => {
+    upgradeWebSocket((c) => {
+      const deviceId = deviceOf.get(c.req.raw)
       let off: (() => void) | null = null
       return {
         onOpen(_e, ws) {
           const send = (e: AntEvent) => ws.send(JSON.stringify(e))
           svc.bus.on('event', send)
-          off = () => svc.bus.off('event', send)
+          const untrack = auth.trackSocket(deviceId, () => ws.close(4001, 'Device removed'))
+          off = () => {
+            svc.bus.off('event', send)
+            untrack()
+          }
         },
         onClose() {
           off?.()

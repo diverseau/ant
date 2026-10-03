@@ -10,6 +10,7 @@
   import Toasts from './lib/ui/Toasts.svelte'
   import FileViewer from './lib/ui/FileViewer.svelte'
   import Settings from './features/settings/Settings.svelte'
+  import Pair from './features/auth/Pair.svelte'
   import { app, init, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
 
   init()
@@ -58,6 +59,9 @@
 
 <svelte:window onkeydown={shortcuts} />
 
+{#if app.mode === 'pair'}
+  <Pair />
+{:else}
 <div class="shell" class:collapsed={app.sidebarCollapsed} class:panel={!!app.panel} inert={!!app.overlay}>
   <Sidebar />
   <main>
@@ -84,6 +88,7 @@
   <Settings />
 {:else if app.overlay === 'usage'}
   <UsagePanel />
+{/if}
 {/if}
 
 <style>

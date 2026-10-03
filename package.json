@@ -13,6 +13,7 @@
     "dev:server": "npm -w @ant/server run dev",
     "check": "npm -ws --if-present run check",
     "test": "npm -ws --if-present run test",
-    "build": "npm -ws --if-present run build"
+    "build": "npm -ws --if-present run build",
+    "pair": "npm -w @ant/server run pair"
   }
 }

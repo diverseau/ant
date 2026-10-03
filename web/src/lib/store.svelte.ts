@@ -1,13 +1,14 @@
 import type { AntEvent, ComputerState, CreateRoutineInput, Health, RoutineView, Settings, SkillView, UsageWindows, ChannelStatus, ConnectorsView } from '@ant/shared'
-import { api, connectEvents, type ColonyPatch, type RoutinePatch } from './api'
+import { api, ApiError, connectEvents, type ColonyPatch, type RoutinePatch } from './api'
 import { ants as seedAnts, colonies as seedColonies, threads as seedThreads, uid } from './mock/data'
 import { respond, stop as stopEngine } from './mock/engine'
 import type { Accessory, Ant, AntColor, ApprovalMessage, DraftMessage, Message, Thread } from './types'
 
 export type Panel = 'computer' | 'details' | null
 export type Overlay = 'palette' | 'new-ant' | 'new-colony' | 'connectors' | 'usage' | 'settings' | null
-/** `live` talks to antd; `demo` runs the scripted mock when antd isn't reachable. */
-export type Mode = 'connecting' | 'live' | 'demo'
+/** `live` talks to antd; `demo` runs the scripted mock when antd isn't reachable; `pair` is a
+ * device antd doesn't know yet (opened from a phone or another computer). */
+export type Mode = 'connecting' | 'live' | 'demo' | 'pair'
 
 export interface Notice {
   id: string
@@ -149,12 +150,23 @@ async function resync() {
   if (!threadById(app.selectedId)) app.selectedId = sortedThreads()[0]?.id ?? ''
 }
 
+let stopEvents: (() => void) | null = null
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('ant:unpaired', () => {
+    stopEvents?.()
+    stopEvents = null
+    app.mode = 'pair'
+  })
+}
+
 export async function init() {
   try {
     await resync()
     app.mode = 'live'
     refreshSkills()
-    connectEvents(
+    stopEvents?.()
+    stopEvents = connectEvents(
       apply,
       () => {
         if (!app.online) resync().catch(fail)
@@ -162,7 +174,11 @@ export async function init() {
       },
       () => (app.online = false),
     )
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      app.mode = 'pair'
+      return
+    }
     // antd isn't running: keep the app usable with the scripted demo.
     app.mode = 'demo'
     app.ants = seedAnts

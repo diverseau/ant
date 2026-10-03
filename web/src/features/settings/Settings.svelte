@@ -5,6 +5,7 @@
   import { rise } from '../../lib/motion'
   import { app, saveSettings } from '../../lib/store.svelte'
   import Modal from '../../lib/ui/Modal.svelte'
+  import Devices from './Devices.svelte'
 
   const close = () => (app.overlay = null)
   const s = $derived(app.settings)
@@ -17,7 +18,8 @@
   ]
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
 
-  let tab: 'general' | 'health' = $state('general')
+  let tab: 'general' | 'devices' | 'health' = $state('general')
+  const TABS = ['general', 'devices', 'health'] as const
   let name = $state(app.settings?.userName ?? '')
 
   const checks = $derived(
@@ -37,13 +39,16 @@
     <h2>Settings</h2>
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected={tab === 'general'} onclick={() => (tab = 'general')}>General</button>
+      <button role="tab" aria-selected={tab === 'devices'} onclick={() => (tab = 'devices')}>Devices</button>
       <button role="tab" aria-selected={tab === 'health'} onclick={() => (tab = 'health')}>Health</button>
-      <span class="tab-pill" style:transform="translateX({tab === 'general' ? 0 : 100}%)"></span>
+      <span class="tab-pill" style:transform="translateX({TABS.indexOf(tab) * 100}%)"></span>
     </div>
   </div>
 
   {#if app.mode !== 'live' || !s}
     <p class="muted pad">Settings are available when antd is running.</p>
+  {:else if tab === 'devices'}
+    <Devices />
   {:else if tab === 'general'}
     <div class="body" in:rise={{ y: 6, duration: 260 }}>
       <label class="field">
@@ -130,7 +135,7 @@
   .tabs {
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     padding: 3px;
     border-radius: var(--r-md);
     background: var(--bg-input);
@@ -154,7 +159,7 @@
     position: absolute;
     top: 3px;
     left: 3px;
-    width: calc(50% - 3px);
+    width: calc(33.333% - 2px);
     height: 28px;
     border-radius: var(--r-sm);
     background: var(--bg-selected);

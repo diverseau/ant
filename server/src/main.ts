@@ -7,6 +7,8 @@ import { startHttp } from './api/http.ts'
 import { Broker } from './broker.ts'
 import { loadConfig } from './config.ts'
 import { openDb } from './db/index.ts'
+import { Auth } from './auth/auth.ts'
+import * as R from './db/repos/index.ts'
 import { IpcServer } from './ipc.ts'
 import { Scheduler } from './scheduler/runtime.ts'
 import { AntService } from './service.ts'
@@ -81,6 +83,12 @@ await ipc.listen()
 const server = startHttp(svc, broker, scheduler, channels, health)
 void channels.startAll()
 console.log(`antd ${cfg.version} on http://${cfg.host}:${cfg.port} · ants in ${cfg.antHome}`)
+// Reachable from other machines (Docker, a home server) with nothing paired yet: print a
+// first pairing code, since there may be no browser on this machine to make one.
+if (!['127.0.0.1', 'localhost', '::1'].includes(cfg.host) && !R.listDevices(db).length) {
+  const { code } = new Auth(db).newPairingCode()
+  console.log(`Pair your first device: open Ant on it and enter ${code} (valid 10 minutes). New code any time: npm run pair`)
+}
 
 function shutdown() {
   void channels.shutdown()

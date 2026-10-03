@@ -20,13 +20,39 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string }
+    const err = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+    // This device isn't (or is no longer) paired: the store switches to the pairing screen.
+    if (res.status === 401 && err.code === 'auth') window.dispatchEvent(new Event('ant:unpaired'))
     throw new ApiError(res.status, err.error ?? `${res.status} ${res.statusText}`)
   }
   return (res.status === 204 || res.status === 202 ? undefined : await res.json()) as T
 }
 
+export interface DeviceView {
+  id: string
+  name: string
+  userAgent: string
+  createdAt: number
+  lastSeenAt: number
+  current: boolean
+}
+
+export interface RemoteView {
+  hosts: string[]
+  urls: string[]
+  devices: number
+  tailscale: { installed: boolean; running: boolean; dnsName?: string; serving: boolean; url?: string }
+}
+
 export const api = {
+  authStatus: () => req<{ trusted: boolean; authenticated: boolean; device: { id: string; name: string } | null }>('GET', '/api/auth/status'),
+  pair: (code: string, name: string) => req<{ device: { id: string; name: string } }>('POST', '/api/auth/pair', { code, name }),
+  logout: () => req<void>('POST', '/api/auth/logout'),
+  pairingCode: () => req<{ code: string; expiresAt: number; urls: string[] }>('POST', '/api/auth/pairing-code'),
+  devices: () => req<DeviceView[]>('GET', '/api/auth/devices'),
+  removeDevice: (id: string) => req<void>('DELETE', `/api/auth/devices/${id}`),
+  remote: () => req<RemoteView>('GET', '/api/remote'),
+  setTailscale: (enabled: boolean) => req<RemoteView>('POST', '/api/remote/tailscale', { enabled }),
   bootstrap: () => req<Bootstrap>('GET', '/api/bootstrap'),
   createAnt: (input: CreateAntInput) => req<Bootstrap['ants'][number]>('POST', '/api/ants', input),
   updateAnt: (id: string, patch: Record<string, unknown>) => req('PATCH', `/api/ants/${id}`, patch),
@@ -89,8 +115,10 @@ export function connectEvents(onEvent: (e: AntEvent) => void, onOpen: () => void
         // ignore malformed frames
       }
     }
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       if (closed) return
+      // 4001: this device was removed. Don't reconnect; show the pairing screen.
+      if (e.code === 4001) return void window.dispatchEvent(new Event('ant:unpaired'))
       onDown()
       setTimeout(open, delay)
       delay = Math.min(delay * 2, 8000)

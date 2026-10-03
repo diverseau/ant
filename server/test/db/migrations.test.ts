@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -23,12 +23,15 @@ function track(db: DatabaseSync): DatabaseSync {
   return db
 }
 
+// The newest bundled migration, so adding one doesn't break these tests.
+const LATEST = Math.max(...readdirSync(new URL('../../src/db/migrations/', import.meta.url)).map((f) => Number(f.split('_')[0])))
+
 describe('database setup', () => {
   it('creates the full schema and sets pragmas on an in-memory database', () => {
     const db = track(openDb(':memory:'))
     expect(db.prepare('PRAGMA foreign_keys').get()!.foreign_keys).toBe(1)
     expect(db.prepare('PRAGMA busy_timeout').get()!.timeout).toBe(5000)
-    expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(2)
+    expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(LATEST)
     const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(row => row.name)
     expect(names).toEqual(expect.arrayContaining(['ants', 'colonies', 'colony_members', 'threads', 'messages', 'messages_fts',
       'runs', 'tool_events', 'approvals', 'rules', 'routines', 'routine_runs', 'delegations', 'connectors',
@@ -46,7 +49,7 @@ describe('database setup', () => {
     }
     const second = track(openDb(path))
     migrate(second)
-    expect(second.prepare('PRAGMA user_version').get()!.user_version).toBe(2)
+    expect(second.prepare('PRAGMA user_version').get()!.user_version).toBe(LATEST)
     expect(second.prepare('SELECT value FROM settings WHERE key = ?').get('sentinel')!.value).toBe('123')
   })
 
