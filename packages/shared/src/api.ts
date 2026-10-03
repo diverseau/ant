@@ -159,6 +159,8 @@ export interface RuleView {
   label: string
   behaviour: 'allow' | 'ask' | 'handoff' | 'deny'
   scope: 'global' | 'ant'
+  /** Written in the app (rather than added with "Always allow" on a card). */
+  written?: boolean
   createdAt: number
 }
 

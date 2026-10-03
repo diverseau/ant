@@ -18,10 +18,11 @@
   import { skills as mockSkills } from '../../lib/mock/data'
   import { api } from '../../lib/api'
   import type { RuleView } from '@ant/shared'
-  import { app, colonyById, deleteColony, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateColony, updateRoutine } from '../../lib/store.svelte'
+  import { app, colonyById, deleteColony, deleteRoutine, deleteThread, selectAnt, setStatus, testRoutine, threadById, threadForAnt, threadMembers, updateAnt, updateColony, updateRoutine, notify } from '../../lib/store.svelte'
   import { collapse, rise } from '../../lib/motion'
   import Switch from '../../lib/ui/Switch.svelte'
   import RoutineEditor from '../routines/RoutineEditor.svelte'
+  import RuleForm from './RuleForm.svelte'
   import RoutineRuns from '../routines/RoutineRuns.svelte'
 
   const thread = $derived(threadById(app.selectedId))
@@ -156,6 +157,23 @@
     liveRules = liveRules.filter((r) => r.id !== id)
     await api.deleteRule(id).catch(() => {})
   }
+  let addingRule = $state(false)
+  const reloadRules = () => ant && api.rules(ant.id).then((r) => (liveRules = r)).catch(() => {})
+  const MODE_LABEL = { allow: 'Allowed', ask: 'Ask first', handoff: 'Hand off', deny: 'Never' } as const
+
+  // Plain-language rules, written into the ant's instructions.
+  let guidance = $state<{ ant: string[]; all: string[] }>({ ant: [], all: [] })
+  let newGuidance = $state('')
+  let guidanceAll = $state(false)
+  $effect(() => {
+    if (app.mode !== 'live' || !ant) return
+    api.guidance(ant.id).then((g) => (guidance = g)).catch(() => {})
+  })
+  async function saveGuidance(next: { ant?: string[]; all?: string[] }) {
+    if (!ant) return
+    guidance = { ...guidance, ...next }
+    await api.setGuidance(ant.id, next).catch((e) => notify(e.message, 'error'))
+  }
 
   let rules = $state([
     { text: 'Sending email or Slack to anyone outside the team', mode: 'Ask first' },
@@ -253,15 +271,33 @@
       <h3><ShieldCheck size={13} /> Rules</h3>
       {#if app.mode === 'live'}
         {#each liveRules as r (r.id)}
-          <div class="item row" out:slide={{ duration: 200 }}>
-            <span class="rule">{r.label}</span>
-            <span class="mode">{r.behaviour === 'allow' ? 'Always allowed' : r.behaviour}</span>
-            <button class="revoke" onclick={() => revoke(r.id)} aria-label="Revoke">Revoke</button>
+          <div class="item row" in:rise={{ y: 4, duration: 200 }} out:slide={{ duration: 200 }}>
+            <span class="rule">{r.label}{#if r.scope === 'global'}<span class="scope">all ants</span>{/if}</span>
+            <span class="mode" class:ask={r.behaviour === 'ask'} class:hand={r.behaviour === 'handoff'} class:never={r.behaviour === 'deny'}>{MODE_LABEL[r.behaviour]}</span>
+            <button class="revoke" onclick={() => revoke(r.id)} aria-label="Remove rule {r.label}">Remove</button>
           </div>
         {/each}
+        {#if addingRule}
+          <RuleForm antId={ant.id} antName={ant.name} oncancel={() => (addingRule = false)} onsaved={() => { addingRule = false; reloadRules() }} />
+        {:else}
+          <button class="btn btn-ghost add-rule" onclick={() => (addingRule = true)}><Plus size={13} /> Add rule</button>
+        {/if}
         <p class="hint">
-          {liveRules.length ? 'Added with “Always allow”.' : 'Nothing permanently allowed yet.'} By default {ant.name} asks before writing outside its folder, sending anything to people or changing connected services, and hands payments and sign-ins to you.
+          By default {ant.name} asks before writing outside its folder, sending anything to people or changing connected services, and hands payments and sign-ins to you. Rules here override that, for every tool call.
         </p>
+
+        <h4>Instructions</h4>
+        {#each [...guidance.ant.map((g, i) => ({ g, i, all: false })), ...guidance.all.map((g, i) => ({ g, i, all: true }))] as x (x.all + x.g)}
+          <div class="item row" in:rise={{ y: 4, duration: 200 }} out:slide={{ duration: 200 }}>
+            <span class="rule">{x.g}{#if x.all}<span class="scope">all ants</span>{/if}</span>
+            <button class="revoke" aria-label="Remove instruction" onclick={() => saveGuidance(x.all ? { all: guidance.all.filter((_, j) => j !== x.i) } : { ant: guidance.ant.filter((_, j) => j !== x.i) })}>Remove</button>
+          </div>
+        {/each}
+        <form class="guidance" onsubmit={(e) => { e.preventDefault(); const t = newGuidance.trim(); if (!t) return; saveGuidance(guidanceAll ? { all: [...guidance.all, t] } : { ant: [...guidance.ant, t] }); newGuidance = '' }}>
+          <input bind:value={newGuidance} maxlength="500" placeholder="e.g. Never email anyone outside acme.com without asking" />
+          <label class="check"><input type="checkbox" bind:checked={guidanceAll} /> All ants</label>
+        </form>
+        <p class="hint">Written into {ant.name}'s instructions. It follows them, but only the rules above are enforced.</p>
       {:else}
         {#each rules as r}
           <div class="item row">
@@ -669,5 +705,50 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .mode.never {
+    color: #f4a69b;
+  }
+
+  .add-rule {
+    margin-top: 6px;
+    height: 30px;
+    font-size: var(--text-xs);
+  }
+
+  h4 {
+    margin-top: 16px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .guidance {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .guidance input:not([type='checkbox']) {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    font-size: var(--text-sm);
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    white-space: nowrap;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 </style>

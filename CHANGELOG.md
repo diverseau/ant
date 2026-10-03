@@ -18,6 +18,8 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Installable web app and push notifications (approvals, hand-offs, and replies when no Ant window is open).
 - Docker image verified on Docker 29.
 - Event routines: GitHub (new issues and PRs, merges, pushes, comments, releases; polled, no public URL), Slack (mentions, messages, phrases, reactions in a channel) and page watches (a public page changes or starts mentioning a phrase; checked by Ant without using Claude until it fires). Event data is passed to the ant as untrusted information, with a 30-second cooldown. Ants can create them with `schedule_routine`.
+- Secure secret card: an ant calls `request_secret`; you paste the value into a write-only card, it's stored encrypted and given to that ant as an environment variable on a fresh process, never as chat text.
+- Rule editor (Details → Rules): "When <ant> wants to send email / post in Slack / change my calendar / use a connector / open a site / run a command / edit files → Allow, Ask first, Hand off or Never", per ant or for all ants. Enforced by Ant's hook on every tool call, so it holds in every permission mode. Plain-language instructions are written into the ant's CLAUDE.md.
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security

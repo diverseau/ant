@@ -10,14 +10,16 @@ export interface Rule {
   behaviour: 'allow' | 'ask' | 'handoff' | 'deny'
   source: 'default' | 'user' | 'admin'
   note: string | null
+  /** How the user described it when writing the rule in the app. */
+  label: string | null
   createdAt: number
 }
-export type AddRuleInput = Pick<Rule, 'scope' | 'pattern' | 'behaviour' | 'source'> & Partial<Pick<Rule, 'antId' | 'note'>>
+export type AddRuleInput = Pick<Rule, 'scope' | 'pattern' | 'behaviour' | 'source'> & Partial<Pick<Rule, 'antId' | 'note' | 'label'>>
 
 export function addRule(db: Db, input: AddRuleInput): Rule {
   const id = newId('rule')
   insert(db, 'rules', { id, scope: input.scope, ant_id: input.antId ?? null, pattern: input.pattern,
-    behaviour: input.behaviour, source: input.source, note: input.note ?? null, created_at: Date.now() })
+    behaviour: input.behaviour, source: input.source, note: input.note ?? null, label: input.label ?? null, created_at: Date.now() })
   return getRow<Rule>(db, 'rules', id)!
 }
 

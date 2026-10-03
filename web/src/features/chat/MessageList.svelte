@@ -17,6 +17,7 @@
   import ChecklistCard from './cards/ChecklistCard.svelte'
   import ComputerCard from './cards/ComputerCard.svelte'
   import DraftCard from './cards/DraftCard.svelte'
+  import SecretCard from './cards/SecretCard.svelte'
   import ToolGroup from './cards/ToolGroup.svelte'
   import FileCard from './cards/FileCard.svelte'
   import ErrorCard from './cards/ErrorCard.svelte'
@@ -189,6 +190,8 @@
                 <ChecklistCard {m} />
               {:else if m.kind === 'approval'}
                 <ApprovalCard {m} threadId={thread.id} />
+              {:else if m.kind === 'secret'}
+                <SecretCard {m} />
               {:else if m.kind === 'draft'}
                 <DraftCard {m} threadId={thread.id} />
               {:else if m.kind === 'tool'}

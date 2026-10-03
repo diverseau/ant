@@ -171,6 +171,20 @@ server.registerTool(
   (args) => call('schedule_routine', args),
 )
 
+server.registerTool(
+  'request_secret',
+  {
+    description:
+      'Ask the user for an API key, token or password you need (e.g. GITHUB_TOKEN). Shows a secure card in chat: the value goes into Ant\'s encrypted store and reaches you only as an environment variable on your next turn, never as chat text. Never ask for secrets in chat any other way. You get a message when it is saved or declined.',
+    inputSchema: {
+      name: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).describe('Environment variable name, e.g. GITHUB_TOKEN'),
+      description: z.string().max(200).describe('What it is, e.g. "GitHub personal access token with repo scope"'),
+      why: z.string().max(400).describe('Why you need it, in one sentence'),
+    },
+  },
+  (args) => call('request_secret', args),
+)
+
 server.registerTool('list_routines', { description: 'List your routines.', inputSchema: {} }, () => call('list_routines', {}))
 
 server.registerTool(

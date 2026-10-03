@@ -91,6 +91,17 @@ export interface DraftMessage extends Base {
   state?: 'sent' | 'discarded'
 }
 
+/** An ant asked for an API key or token. The value goes from this card straight into the
+ * encrypted secret store and is given to the ant as an environment variable, never as chat text. */
+export interface SecretMessage extends Base {
+  kind: 'secret'
+  /** Environment variable name, e.g. GITHUB_TOKEN. */
+  name: string
+  description: string
+  why: string
+  state?: 'saved' | 'declined'
+}
+
 export interface SystemMessage extends Base {
   kind: 'system'
   text: string
@@ -135,6 +146,7 @@ export type Message =
   | ChecklistMessage
   | ApprovalMessage
   | DraftMessage
+  | SecretMessage
   | SystemMessage
   | RoutineMessage
 

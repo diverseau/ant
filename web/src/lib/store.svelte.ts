@@ -689,3 +689,12 @@ export function setStatus(antId: string, status: Ant['status']) {
   a.status = status
   if (live() && (status === 'paused' || status === 'idle')) api.updateAnt(antId, { status }).catch(fail)
 }
+
+/** Secure secret card: send the value (or a decline) once; the card shows only the outcome. */
+export async function answerSecret(messageId: string, value: string | null) {
+  if (live()) return api.answerSecret(messageId, value)
+  for (const t of app.threads) {
+    const m = t.messages.find((x) => x.id === messageId)
+    if (m && m.kind === 'secret') m.state = value === null ? 'declined' : 'saved'
+  }
+}

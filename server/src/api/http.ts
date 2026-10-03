@@ -232,6 +232,30 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     return c.body(null, 204)
   })
 
+  // Secure secret card: the value goes into the vault and the ant gets it as an env var.
+  app.post('/api/messages/:id/secret', async (c) => {
+    const b = await body(c, z.object({ value: z.string().min(1).max(20_000).optional(), decline: z.boolean().optional() }))
+    const m = R.getMessage(svc.db, c.req.param('id'))
+    if (!m || m.kind !== 'secret') throw new HttpError(404, 'No such request')
+    const p = m.payload as { name: string; description: string; state?: string }
+    if (p.state) throw new HttpError(409, 'Already answered')
+    const antId = m.author
+    if (b.decline || !b.value) {
+      svc.patch(m.id, { state: 'declined' })
+      svc.enqueue(antId, { threadId: m.threadId, text: `[${svc.userName}] I declined to give you ${p.name}. Carry on without it, or tell me what you can't do.`, source: 'user', depth: 0, enqueuedAt: Date.now() })
+      return c.body(null, 204)
+    }
+    const reg = svc.registry!
+    const existing = reg.secrets().find((s) => s.name === p.name)
+    if (existing) reg.updateSecret(existing.id, { value: b.value, antIds: [...new Set([...existing.antIds, antId])] })
+    else reg.addSecret({ name: p.name, description: p.description || `Requested by ${R.getAnt(svc.db, antId)?.name ?? 'an ant'}`, value: b.value, antIds: [antId] })
+    svc.patch(m.id, { state: 'saved' })
+    // A fresh process gets the new environment variable.
+    svc.refreshIdle()
+    svc.enqueue(antId, { threadId: m.threadId, text: `[${svc.userName}] I saved ${p.name} for you. It's in your environment as $${p.name}. Carry on.`, source: 'user', depth: 0, enqueuedAt: Date.now() })
+    return c.body(null, 204)
+  })
+
   app.post('/api/messages/:id/draft', async (c) => {
     const b = await body(c, z.object({ action: z.enum(['send', 'discard']), body: z.string().max(50_000).optional() }))
     const m = R.getMessage(svc.db, c.req.param('id'))
@@ -525,13 +549,48 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
       R.listRules(svc.db, { antId: id }).map((r) => ({
         id: r.id,
         pattern: r.pattern,
-        label: r.note?.startsWith('input:') ? `${r.pattern === 'Bash' ? 'Run' : r.pattern} · ${r.note.slice(6).replace(/\\"/g, '"').slice(0, 80)}` : describeTool(r.pattern, {}).title,
+        label: r.label ?? (r.note?.startsWith('input:') ? `${r.pattern === 'Bash' ? 'Run' : r.pattern} · ${r.note.slice(6).replace(/\\"/g, '"').slice(0, 80)}` : describeTool(r.pattern, {}).title),
+        written: r.source === 'user' && !!r.label,
         behaviour: r.behaviour,
         scope: r.scope,
         createdAt: r.createdAt,
       })),
     )
   })
+  // Rules written in the app (Details → Rules → Add rule).
+  app.post('/api/rules', async (c) => {
+    const b = await body(c, z.object({
+      antId: z.string().nullable(),
+      pattern: z.string().min(1).max(400).regex(/^[\w*|.-]+$/, 'Tool patterns use letters, digits, _, -, . and * (| between alternatives)'),
+      behaviour: z.enum(['allow', 'ask', 'handoff', 'deny']),
+      inputContains: z.string().max(300).optional(),
+      label: z.string().min(1).max(120),
+    }))
+    if (b.antId) svc.antRow(b.antId)
+    const contains = b.inputContains?.trim()
+    const rule = R.addRule(svc.db, {
+      scope: b.antId ? 'ant' : 'global', antId: b.antId, pattern: b.pattern, behaviour: b.behaviour, source: 'user', label: b.label.trim(),
+      ...(contains && { note: `input:${JSON.stringify(contains).slice(1, -1)}` }),
+    })
+    // Allow rules become part of the generated settings on the next session.
+    if (b.behaviour === 'allow') svc.refreshIdle()
+    return c.json({ id: rule.id }, 201)
+  })
+
+  // Plain-language rules: written into the ant's CLAUDE.md, so it follows them as instructions.
+  app.get('/api/ants/:id/guidance', (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    return c.json({ ant: R.getSetting<string[]>(svc.db, `guidance.${id}`, []), all: R.getSetting<string[]>(svc.db, 'guidance.global', []) })
+  })
+  app.put('/api/ants/:id/guidance', async (c) => {
+    const id = svc.antRow(c.req.param('id')).id
+    const b = await body(c, z.object({ ant: z.array(z.string().min(1).max(500)).max(30).optional(), all: z.array(z.string().min(1).max(500)).max(30).optional() }))
+    if (b.ant) R.setSetting(svc.db, `guidance.${id}`, b.ant.map((s) => s.trim()).filter(Boolean))
+    if (b.all) R.setSetting(svc.db, 'guidance.global', b.all.map((s) => s.trim()).filter(Boolean))
+    svc.refreshIdle()
+    return c.body(null, 204)
+  })
+
   app.delete('/api/rules/:id', (c) => {
     if (!R.deleteRule(svc.db, c.req.param('id'))) throw new HttpError(404, 'No such rule')
     // Allow rules are baked into each ant's generated settings; regenerate on next turn.

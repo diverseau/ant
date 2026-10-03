@@ -45,6 +45,7 @@ export interface RemoteView {
 }
 
 export const api = {
+  answerSecret: (messageId: string, value: string | null) => req<void>('POST', `/api/messages/${messageId}/secret`, value === null ? { decline: true } : { value }),
   authStatus: () => req<{ trusted: boolean; authenticated: boolean; device: { id: string; name: string } | null }>('GET', '/api/auth/status'),
   pair: (code: string, name: string) => req<{ device: { id: string; name: string } }>('POST', '/api/auth/pair', { code, name }),
   logout: () => req<void>('POST', '/api/auth/logout'),
@@ -69,6 +70,9 @@ export const api = {
   older: (threadId: string, before: string) => req<Message[]>('GET', `/api/threads/${threadId}/messages?before=${encodeURIComponent(before)}`),
   rules: (antId: string) => req<RuleView[]>('GET', `/api/ants/${antId}/rules`),
   deleteRule: (id: string) => req('DELETE', `/api/rules/${id}`),
+  addRule: (rule: { antId: string | null; pattern: string; behaviour: 'allow' | 'ask' | 'handoff' | 'deny'; label: string; inputContains?: string }) => req<{ id: string }>('POST', '/api/rules', rule),
+  guidance: (antId: string) => req<{ ant: string[]; all: string[] }>('GET', `/api/ants/${antId}/guidance`),
+  setGuidance: (antId: string, g: { ant?: string[]; all?: string[] }) => req<void>('PUT', `/api/ants/${antId}/guidance`, g),
   connectors: () => req<ConnectorsView>('GET', '/api/connectors'),
   setClaudeAi: (key: string, disabledFor: string[]) => req<ConnectorsView>('PATCH', '/api/connectors/claudeai', { key, disabledFor }),
   addConnector: (input: Record<string, unknown>) => req<ConnectorsView>('POST', '/api/connectors', input),

@@ -68,6 +68,7 @@ export async function poll(repo: string, opts: { etag?: string | null; token?: s
       signal: AbortSignal.timeout(15_000),
     })
     if (r.status === 304) return { status: 'unchanged' }
+    if (r.status === 401) return { status: 'error', message: 'GitHub rejected the GITHUB_TOKEN secret. Replace it in Connectors → Secrets.' }
     if (r.status === 404) return { status: 'error', message: `GitHub can't see ${repo}. For a private repo, add a GITHUB_TOKEN secret.` }
     if (r.status === 403 || r.status === 429) return { status: 'error', message: 'GitHub rate limit reached; a GITHUB_TOKEN secret raises it.' }
     if (!r.ok) return { status: 'error', message: `GitHub answered ${r.status}` }

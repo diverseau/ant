@@ -21,8 +21,10 @@ const READ_VERBS = /(^|_)(get|list|search|read|fetch|find|query|lookup|describe|
 const SEND_VERBS = /(^|_)(send|reply|forward|post|publish|create|update|delete|remove|trash|archive|move|share|invite|transfer|pay|purchase|buy|book|cancel|submit|upload|write|set|add|apply|merge|deploy)(_|$)/i
 const MONEY = /(pay|purchase|buy|checkout|billing|invoice_pay|transfer|wire)/i
 
+/** `*` matches anything; `a|b` matches either (rules written in the app use both). */
 export function globMatch(pattern: string, name: string): boolean {
-  const re = new RegExp('^' + pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$')
+  if (pattern.includes('|')) return pattern.split('|').some((p) => globMatch(p, name))
+  const re = new RegExp('^' + pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i')
   return re.test(name)
 }
 

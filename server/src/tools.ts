@@ -4,11 +4,12 @@ import type { EventSpec } from '@ant/shared'
 import { existsSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { MemoryStore } from './memory/store.ts'
+import { isReservedName, SECRET_NAME } from './secrets/vault.ts'
 import { SEND_TOOL, targetsSelf, type Broker } from './broker.ts'
 import type { Scheduler } from './scheduler/runtime.ts'
 import * as R from './db/repos/index.ts'
 import { toAnt } from './mappers.ts'
-import { insideFolder } from './rules/engine.ts'
+import { globMatch, insideFolder } from './rules/engine.ts'
 import type { AntService } from './service.ts'
 import { evaluateFloors } from './rules/floors.ts'
 
@@ -41,6 +42,15 @@ export function registerTools(svc: AntService, broker: Broker, scheduler: Schedu
       body: str(p.body),
     })
     return `Draft shown to ${svc.userName}. Nothing has been sent. If they press Send you'll get a message telling you to send it; until then, don't send it any other way.`
+  })
+
+  ipc.on('request_secret', (antId, p) => {
+    const name = str(p.name).trim().toUpperCase()
+    if (!SECRET_NAME.test(name) || isReservedName(name)) return `${name || 'That'} can't be used as a secret name. Use something like GITHUB_TOKEN.`
+    const existing = svc.registry?.secrets().find((s) => s.name === name)
+    if (existing && (existing.allAnts || existing.antIds.includes(antId))) return `You already have ${name} as an environment variable. If it's wrong, say so and ask ${svc.userName} to replace it in Connectors → Secrets.`
+    svc.insert(svc.threadForAnt(antId), antId, 'secret', { name, description: str(p.description).slice(0, 200), why: str(p.why).slice(0, 400) })
+    return `Asked ${svc.userName} for ${name} with a secure card. You'll get a message when it's saved (then it's in your environment as $${name}) or declined. Don't ask for the value in chat.`
   })
 
   ipc.on('set_status', (antId, p) => {
@@ -180,6 +190,11 @@ export const floors = {
     if ((tool === 'WebFetch' || tool === 'mcp__browser__browser_navigate') && targetsSelf(JSON.stringify(p.tool_input ?? {}), svc.cfg.selfPorts)) {
       return { action: 'block', message: "That address is Ant's own control panel, which ants can't access. Don't retry." }
     }
+    // Rules written in the app: "Always ask" / "Hand off" / "Never" hold even for tools Claude Code
+    // would otherwise allow (edits in its folder, its browser, web fetches, full access).
+    const strict = userRuleVerdict(svc, antId, tool, p.tool_input)
+    if (strict === 'deny') return { action: 'block', message: `${svc.userName} set a rule that blocks this. Don't retry; say what you needed instead.` }
+    if (strict) return { action: 'ask', message: strict === 'handoff' ? `${svc.userName} wants to do this themselves` : `${svc.userName} asked to be asked first` }
     const mode = R.getAnt(svc.db, antId)?.permissionMode
     if ((mode === 'full' || mode === 'auto') && /^mcp__/.test(tool) && !/^mcp__(ant|browser)__/.test(tool) && SEND_TOOL.test(tool)) {
       // Sends go through the approval card, where an approved draft's text is let through.
@@ -206,6 +221,17 @@ export const floors = {
     }
     return { action: 'pass' }
   },
+}
+
+function userRuleVerdict(svc: AntService, antId: string, tool: string, input: unknown): 'ask' | 'handoff' | 'deny' | null {
+  // The permission prompt itself and Ant's own tools are never subject to user rules.
+  if (tool.startsWith('mcp__ant__')) return null
+  const encoded = JSON.stringify(input ?? {})
+  const hits = R.listRules(svc.db, { antId }).filter(
+    (r) => r.source === 'user' && r.behaviour !== 'allow' && globMatch(r.pattern, tool) && (!r.note?.startsWith('input:') || encoded.includes(r.note.slice(6))),
+  )
+  for (const b of ['deny', 'handoff', 'ask'] as const) if (hits.some((r) => r.behaviour === b)) return b
+  return null
 }
 
 const RISKY_CLICK = /\b(buy|purchase|pay|place order|checkout|check out|confirm order|subscribe|send|submit|delete|remove|transfer|publish|post|sign up|book now|reserve)\b/i

@@ -436,6 +436,7 @@ export class AntService {
         allowedDomains: R.getSetting<string[]>(this.db, `ant.${antId}.domains`, []),
         permissionMode: row.permissionMode as PermissionMode,
         fast: row.fast,
+        guidance: [...R.getSetting<string[]>(this.db, 'guidance.global', []), ...R.getSetting<string[]>(this.db, `guidance.${antId}`, [])],
       },
       token,
       all.filter((a) => a.id !== antId).map((a) => antPaths(this.cfg, { id: a.id, slug: a.slug }).folder),
@@ -450,7 +451,11 @@ export class AntService {
 
   /** Restart idle ants so config changes (connectors, secrets) apply on their next turn. */
   refreshIdle() {
-    for (const [antId, l] of this.live) if (!l.current) this.stopAnt(antId)
+    // Busy ants pick the change up as soon as their current turn ends.
+    for (const [antId, l] of this.live) {
+      if (l.current) l.restartAfterTurn = true
+      else this.stopAnt(antId)
+    }
   }
 
   /** A stable CDP port per ant, so its MCP config can name it before Chromium starts. */
