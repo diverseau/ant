@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DIRECTORY, type DirectoryEntry } from './directory'
   import { logoDomain } from '@ant/shared'
   import Logo from '../../lib/ui/Logo.svelte'
   import ExternalLink from '@lucide/svelte/icons/external-link'
@@ -38,6 +39,12 @@
 
   function splitArgs(line: string): string[] {
     return (line.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((a) => a.replace(/^["']|["']$/g, ''))
+  }
+
+  const available = $derived(view ? DIRECTORY.filter((d) => !view!.custom.some((c) => c.name === d.name)) : [])
+
+  async function addFromDirectory(d: DirectoryEntry) {
+    await connectorsDo(() => api.addConnector({ name: d.name, transport: 'http', url: d.url, ...(d.headers && { headers: d.headers }) }), setView, `${d.name} added. Choose which ants get it.`)
   }
 
   async function addCustom() {
@@ -150,6 +157,21 @@
     {:else}
       {#if !adding}<p class="empty">No custom connectors yet.</p>{/if}
     {/each}
+    {#if available.length}
+      <h4 class="dir-title">Popular</h4>
+      <div class="dir">
+        {#each available as d (d.name)}
+          <div class="dir-item" in:rise={{ y: 4, duration: 220 }}>
+            <Logo name={d.name} domain={d.domain} size={28} />
+            <div class="dir-meta">
+              <span class="name">{d.name}</span>
+              <span class="sub">{d.description}{#if d.needsSecret} · needs a <code>{d.needsSecret}</code> secret{/if}</span>
+            </div>
+            <button class="btn btn-ghost sm" onclick={() => addFromDirectory(d)}><Plus size={13} /> Add</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
     {#if adding}
       <form class="card form" in:slide={{ duration: 220 }} onsubmit={(e) => (e.preventDefault(), addCustom())}>
         <input bind:value={cName} placeholder="Name, e.g. linear" maxlength="40" />
@@ -472,5 +494,45 @@
   code {
     font-size: 0.92em;
     color: var(--text-soft);
+  }
+
+  .dir-title {
+    margin: 14px 2px 6px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-faint);
+  }
+
+  .dir {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+  }
+
+  .dir-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    transition: border-color var(--dur-fast);
+  }
+
+  .dir-item:hover {
+    border-color: var(--border-strong);
+  }
+
+  .dir-meta {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dir-meta .sub {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 </style>

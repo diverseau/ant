@@ -27,7 +27,11 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Ant templates: Duplicate an ant, Export it as a `.ant.json` file, or Import one (sidebar + → Import an ant…). Profile, skills, routines (not webhooks), rules and instructions travel; history, memory, files, browser logins and secrets never do.
 - Per-ant switches: mute an ant's notifications (approvals still notify) and hide it from the sidebar (+ → Show hidden ants).
 - Routine run history shows each run's API-equivalent cost.
+- Connector directory (Connectors → Custom → Popular): one-click remote MCP servers that need no interactive sign-in (context7, DeepWiki, Cloudflare docs, Hugging Face, Exa, and GitHub with a `GITHUB_TOKEN` secret expanded by Claude Code at runtime).
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
+
+### Fixed
+- Read-only connector tools with hyphenated names (e.g. `query-docs`) no longer ask for approval; send/create verbs with hyphens are recognised too.
 
 ### Security
 - In Auto and Full access the PreToolUse floors also deny WebFetch/browser navigation to Ant's own ports and send connector messages through the approval card, since those modes skip the permission prompt.

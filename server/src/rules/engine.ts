@@ -17,8 +17,8 @@ export interface Verdict {
   reason: string
 }
 
-const READ_VERBS = /(^|_)(get|list|search|read|fetch|find|query|lookup|describe|view|download|retrieve|count|check|status)(_|$)/i
-const SEND_VERBS = /(^|_)(send|reply|forward|post|publish|create|update|delete|remove|trash|archive|move|share|invite|transfer|pay|purchase|buy|book|cancel|submit|upload|write|set|add|apply|merge|deploy)(_|$)/i
+const READ_VERBS = /(^|[_-])(get|list|search|read|fetch|find|query|lookup|describe|view|download|retrieve|count|check|status|resolve|ask|docs)([_-]|$)/i
+const SEND_VERBS = /(^|[_-])(send|reply|forward|post|publish|create|update|delete|remove|trash|archive|move|share|invite|transfer|pay|purchase|buy|book|cancel|submit|upload|write|set|add|apply|merge|deploy)([_-]|$)/i
 const MONEY = /(pay|purchase|buy|checkout|billing|invoice_pay|transfer|wire)/i
 
 /** `*` matches anything; `a|b` matches either (rules written in the app use both). */
