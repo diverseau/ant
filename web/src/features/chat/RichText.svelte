@@ -16,16 +16,34 @@
 
 <div class="rich">
   {#each blocks as b, bi}
+    {@const last = bi === blocks.length - 1}
     {#if b.t === 'p'}
-      <p>{@render inl(b.inl, bi === blocks.length - 1)}</p>
+      <p>{@render inl(b.inl, last)}</p>
+    {:else if b.t === 'h'}
+      <svelte:element this={`h${b.level + 2}`} class="h">{@render inl(b.inl, last)}</svelte:element>
     {:else if b.t === 'quote'}
       <blockquote>{@render inl(b.inl, false)}</blockquote>
+    {:else if b.t === 'pre'}
+      <pre>{b.v}</pre>
+    {:else if b.t === 'table'}
+      <div class="table">
+        <table>
+          <thead>
+            <tr>{#each b.head as c, ci}<th style:text-align={b.align[ci]}>{@render inl(c, false)}</th>{/each}</tr>
+          </thead>
+          <tbody>
+            {#each b.rows as row}
+              <tr>{#each row as c, ci}<td style:text-align={b.align[ci]}>{@render inl(c, false)}</td>{/each}</tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {:else}
-      <ul>
+      <svelte:element this={b.t} start={b.t === 'ol' && b.start !== 1 ? b.start : undefined}>
         {#each b.items as item, ii}
-          <li>{@render inl(item, bi === blocks.length - 1 && ii === b.items.length - 1)}</li>
+          <li>{@render inl(item, last && ii === b.items.length - 1)}</li>
         {/each}
-      </ul>
+      </svelte:element>
     {/if}
   {/each}
   {#if !blocks.length && streaming}<p><span class="caret"></span></p>{/if}
@@ -48,16 +66,90 @@
     color: var(--text-muted);
   }
 
-  blockquote + p,
-  p + p,
-  p + ul,
-  ul + p {
+  .rich > * + * {
     margin-top: 0.7em;
   }
 
-  ul {
+  .h {
+    margin: 0;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  h3.h {
+    font-size: 1.15em;
+  }
+
+  h4.h {
+    font-size: 1.05em;
+  }
+
+  h5.h {
+    font-size: 1em;
+  }
+
+  .rich > * + .h {
+    margin-top: 1.1em;
+  }
+
+  ul,
+  ol {
     margin: 0;
     padding-left: 1.25em;
+  }
+
+  pre {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: rgb(0 0 0 / 0.22);
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.8em;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-x: auto;
+    overflow-wrap: normal;
+  }
+
+  /* Wide tables scroll sideways inside the bubble rather than squashing. */
+  .table {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88em;
+    line-height: 1.5;
+    overflow-wrap: normal;
+  }
+
+  th,
+  td {
+    min-width: 7em;
+    padding: 7px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--font-ui);
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: rgb(255 255 255 / 0.03);
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr + tr td {
+    border-top: 1px solid var(--border);
+  }
+
+  th + th,
+  td + td {
+    border-left: 1px solid var(--border);
   }
 
   li {
