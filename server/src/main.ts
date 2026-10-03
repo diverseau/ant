@@ -8,6 +8,8 @@ import { Broker } from './broker.ts'
 import { loadConfig } from './config.ts'
 import { openDb } from './db/index.ts'
 import { Auth } from './auth/auth.ts'
+import { tailscaleInfo } from './auth/remote.ts'
+import { PushHub } from './push/push.ts'
 import * as R from './db/repos/index.ts'
 import { IpcServer } from './ipc.ts'
 import { Scheduler } from './scheduler/runtime.ts'
@@ -39,6 +41,13 @@ const channels = new ChannelHub(
   (name) => svc.registry!.secretValue(name),
 )
 registerTools(svc, broker, scheduler)
+
+// Phones: push when a reply lands and nobody has Ant open (approvals push from the broker).
+svc.push = new PushHub(db, () => process.env.ANT_PUBLIC_URL || tailscaleInfo(cfg.port).url || 'mailto:ant@localhost')
+svc.bus.on('turn.finished', (e: { antId: string; turn: { threadId: string; source: string }; ok: boolean; text: string }) => {
+  if (!e.ok || (e.turn.source !== 'user' && e.turn.source !== 'routine') || !e.text.trim()) return
+  svc.alert({ title: R.getAnt(db, e.antId)?.name ?? 'Ant', body: e.text.trim().replace(/\s+/g, ' '), url: `/?thread=${e.turn.threadId}`, tag: e.turn.threadId })
+})
 
 function which(bin: string): boolean {
   try {

@@ -6,6 +6,7 @@ import { LoopGuard } from './colony/loop-guard.ts'
 import { ComputerManager } from './computer/manager.ts'
 import { SkillRegistry } from './skills/registry.ts'
 import type { Registry } from './connectors/registry.ts'
+import type { PushHub, PushPayload } from './push/push.ts'
 import { antDataDir, type Config } from './config.ts'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import type { Db } from './db/index.ts'
@@ -74,6 +75,9 @@ export class AntService {
   readonly skills: SkillRegistry
   /** Set by main.ts; connectors and secrets. */
   registry: Registry | null = null
+  push: PushHub | null = null
+  /** Ant windows open and visible right now (reported by the web app over /ws). */
+  visibleClients = 0
   private reaper: NodeJS.Timeout
   readonly db: Db
   readonly cfg: Config
@@ -169,6 +173,12 @@ export class AntService {
     const t = R.getThreadByRef(this.db, 'ant', antId)
     if (!t) throw new HttpError(404, 'Ant has no thread')
     return t
+  }
+
+  /** Push to paired phones: always, or only when no Ant window is visible anywhere. */
+  alert(p: PushPayload, always = false) {
+    if (!this.push || (!always && this.visibleClients > 0)) return
+    void this.push.send(p).catch(() => {})
   }
 
   /* ---------------- ants ---------------- */

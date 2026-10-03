@@ -55,6 +55,38 @@
       app.overlay = 'connectors'
     }
   }
+
+  // Phone layout: swipe from the left edge of the chat to go back to the ant list.
+  let drag = $state(0)
+  let swipe: { x: number; y: number; on: boolean } | null = null
+  const phone = () => matchMedia('(max-width: 720px)').matches
+
+  function swipeStart(e: TouchEvent) {
+    const t = e.touches[0]
+    swipe = phone() && app.mobileChat && t.clientX < 28 ? { x: t.clientX, y: t.clientY, on: false } : null
+  }
+  function swipeMove(e: TouchEvent) {
+    if (!swipe) return
+    const t = e.touches[0]
+    const dx = t.clientX - swipe.x
+    if (!swipe.on && Math.abs(t.clientY - swipe.y) > Math.abs(dx)) return void (swipe = null)
+    swipe.on = dx > 8
+    if (swipe.on) drag = Math.max(0, dx)
+  }
+  function swipeEnd() {
+    if (swipe?.on && drag > innerWidth * 0.33) app.mobileChat = false
+    swipe = null
+    drag = 0
+  }
+
+  $effect(() => {
+    // The list is the phone's home screen; the compact sidebar makes no sense there.
+    const mq = matchMedia('(max-width: 720px)')
+    const apply = () => mq.matches && (app.sidebarCollapsed = false)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  })
 </script>
 
 <svelte:window onkeydown={shortcuts} />
@@ -62,9 +94,9 @@
 {#if app.mode === 'pair'}
   <Pair />
 {:else}
-<div class="shell" class:collapsed={app.sidebarCollapsed} class:panel={!!app.panel} inert={!!app.overlay}>
+<div class="shell" class:collapsed={app.sidebarCollapsed} class:panel={!!app.panel} class:chat-open={app.mobileChat} class:dragging={drag > 0} style:--drag="{drag}px" inert={!!app.overlay}>
   <Sidebar />
-  <main>
+  <main ontouchstart={swipeStart} ontouchmove={swipeMove} ontouchend={swipeEnd} ontouchcancel={swipeEnd}>
     <Chat />
   </main>
   <RightPanel />
@@ -128,6 +160,46 @@
   @media (max-width: 960px) {
     .shell.panel {
       --rp: 0px;
+    }
+  }
+
+  /* Phones: the ant list and the chat are two screens; the chat slides in over the list. */
+  @media (max-width: 720px) {
+    .shell {
+      display: block;
+      position: relative;
+    }
+
+    .shell > :global(.sidebar),
+    main {
+      position: absolute;
+      inset: 0;
+      transition: transform 420ms var(--ease-out);
+      will-change: transform;
+    }
+
+    .shell > :global(.sidebar) {
+      border-right: 0;
+    }
+
+    main {
+      z-index: 2;
+      background: var(--bg-app);
+      transform: translateX(100%);
+      box-shadow: -12px 0 32px -16px rgb(0 0 0 / 0.7);
+    }
+
+    .chat-open main {
+      transform: translateX(var(--drag));
+    }
+
+    .chat-open > :global(.sidebar) {
+      transform: translateX(calc(-28% + var(--drag) * 0.28));
+    }
+
+    .dragging main,
+    .dragging > :global(.sidebar) {
+      transition: none;
     }
   }
 </style>

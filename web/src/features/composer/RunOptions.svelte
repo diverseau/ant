@@ -197,4 +197,11 @@
       transform: scale(0.6) rotate(-20deg);
     }
   }
+
+  /* Phones: keep labels whole; the row scrolls sideways if it ever runs out of room. */
+  @media (max-width: 720px) {
+    .opt {
+      flex: none;
+    }
+  }
 </style>

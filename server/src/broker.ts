@@ -105,6 +105,7 @@ export class Broker {
     svc.setStatus(antId, 'attention')
     svc.emit({ type: 'notice', level: 'warn', text: `${R.getAnt(svc.db, antId)?.name ?? 'An ant'} needs you on its computer` })
     desktopNotify(R.getAnt(svc.db, antId)?.name ?? 'An ant', `Needs you on its computer: ${reason}`)
+    svc.alert({ title: R.getAnt(svc.db, antId)?.name ?? 'An ant', body: `Needs you on its computer: ${reason}`, url: `/?thread=${threadId}`, tag: approval.id }, true)
     const decision = await new Promise<ApprovalDecision>((resolve) => this.waiters.set(approval.id, resolve))
     if (decision === 'deny') return `${svc.userName} declined to take over. Continue without it or explain what's blocked.`
     return `${svc.userName} finished on the computer and handed it back. Check the page state and carry on.`
@@ -141,6 +142,7 @@ export class Broker {
     svc.setStatus(antId, 'attention')
     // Nobody may be watching an unattended run: tell the desktop, it expires in 10 minutes.
     if (unattended) desktopNotify(R.getAnt(svc.db, antId)?.name ?? 'An ant', `Needs your approval: ${a.action}`)
+    svc.alert({ title: R.getAnt(svc.db, antId)?.name ?? 'An ant', body: `Needs your approval: ${a.action}`, url: `/?thread=${threadId}`, tag: approval.id }, unattended)
     return new Promise((resolve) => this.waiters.set(approval.id, resolve))
   }
 

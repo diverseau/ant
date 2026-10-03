@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import Monitor from '@lucide/svelte/icons/monitor'
   import PanelRight from '@lucide/svelte/icons/panel-right'
   import Ant from '../../lib/ant/Ant.svelte'
@@ -37,6 +38,7 @@
   <section class="chat">
     <header>
       <div class="who">
+        <button class="icon-btn back" aria-label="Back to ants" onclick={() => (app.mobileChat = false)}><ChevronLeft size={20} /></button>
         {#if ant}
           <Ant color={ant.color} accessory={ant.accessory} status={ant.status} size={26} />
         {:else}
@@ -193,6 +195,29 @@
     height: 52px;
     padding: 0 14px 0 20px;
     border-bottom: 1px solid var(--border);
+  }
+
+  .back {
+    display: none;
+  }
+
+  @media (max-width: 720px) {
+    header {
+      padding: 0 8px 0 4px;
+    }
+
+    .back {
+      display: grid;
+      margin-right: -2px;
+    }
+
+    .dock {
+      padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+    }
+
+    .hero {
+      padding: 20px 16px 6vh;
+    }
   }
 
   .who {

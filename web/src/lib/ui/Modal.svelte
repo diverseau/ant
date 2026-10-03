@@ -63,6 +63,21 @@
     padding-top: 14vh;
   }
 
+  @media (max-width: 720px) {
+    .backdrop,
+    .backdrop.top {
+      place-items: end center;
+      padding: 0;
+    }
+
+    .panel {
+      max-width: none !important;
+      max-height: 92dvh !important;
+      border-radius: var(--r-xl) var(--r-xl) 0 0 !important;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
   .panel {
     width: 100%;
     max-height: 80vh;

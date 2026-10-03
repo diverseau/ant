@@ -8,6 +8,7 @@
   import { rise } from '../../lib/motion'
   import { notify } from '../../lib/store.svelte'
   import Logo from '../../lib/ui/Logo.svelte'
+  import { disablePush, enablePush, pushState, type PushState } from '../../lib/push'
 
   // Remote access (Tailscale), pairing new devices, and the paired-device list.
   type Pairing = { code: string; expiresAt: number; urls: string[] }
@@ -20,7 +21,27 @@
   let now = $state(Date.now())
   let confirming = $state<string | null>(null)
 
+  let push = $state<PushState | null>(null)
+  let pushBusy = $state(false)
+
+  async function togglePush() {
+    pushBusy = true
+    try {
+      if (push === 'on') await disablePush()
+      else {
+        await enablePush()
+        notify('Sent a test notification.')
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), 'warn')
+    } finally {
+      push = await pushState()
+      pushBusy = false
+    }
+  }
+
   async function load() {
+    pushState().then((p) => (push = p))
     const [r, d, s] = await Promise.all([api.remote(), api.devices(), api.authStatus()])
     remote = r
     devices = d
@@ -117,6 +138,26 @@
         To use Ant from your phone, install <a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Tailscale</a> on this computer and the phone. Or put Ant behind your own https proxy and add its name to <code>ANT_ALLOWED_HOSTS</code>.
       </p>
     {/if}
+  </section>
+
+  <section>
+    <h3>Notifications on this device</h3>
+    <div class="row card">
+      <div class="grow">
+        <div class="title">{push === 'on' ? 'On' : 'Off'}</div>
+        <div class="sub">
+          {#if push === 'needs-install'}On iPhone, tap Share → Add to Home Screen, open Ant from there, then turn this on.
+          {:else if push === 'unsupported'}This browser can’t receive notifications here (it needs https: use the Tailscale address).
+          {:else if push === 'denied'}Notifications are blocked for this site in the browser’s settings.
+          {:else}When an ant needs you or replies while Ant isn’t open on any screen.{/if}
+        </div>
+      </div>
+      {#if push === 'on' || push === 'off'}
+        <button class="btn" class:btn-accent={push === 'off'} class:btn-ghost={push === 'on'} disabled={pushBusy} onclick={togglePush}>
+          {pushBusy ? 'Working…' : push === 'on' ? 'Turn off' : 'Turn on'}
+        </button>
+      {/if}
+    </div>
   </section>
 
   <section>

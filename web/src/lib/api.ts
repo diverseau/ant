@@ -106,6 +106,7 @@ export function connectEvents(onEvent: (e: AntEvent) => void, onOpen: () => void
     ws = new WebSocket(url)
     ws.onopen = () => {
       delay = 500
+      presence()
       onOpen()
     }
     ws.onmessage = (m) => {
@@ -124,9 +125,13 @@ export function connectEvents(onEvent: (e: AntEvent) => void, onOpen: () => void
       delay = Math.min(delay * 2, 8000)
     }
   }
+  // Tell antd whether this window is visible: phones get pushes only when nobody's looking.
+  const presence = () => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'presence', visible: document.visibilityState === 'visible' }))
+  document.addEventListener('visibilitychange', presence)
   open()
   return () => {
     closed = true
+    document.removeEventListener('visibilitychange', presence)
     ws?.close()
   }
 }

@@ -753,4 +753,21 @@
     text-overflow: ellipsis;
   }
 
+
+  /* Phones: 16px stops iOS zooming into the field; the long hints don't fit. */
+  @media (max-width: 720px) {
+    textarea {
+      font-size: 16px;
+      padding: 13px 14px 4px;
+    }
+
+    .hint {
+      display: none;
+    }
+
+    .foot {
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+  }
 </style>

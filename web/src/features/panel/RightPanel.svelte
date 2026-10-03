@@ -62,6 +62,13 @@
     }
   }
 
+  @media (max-width: 720px) {
+    .right {
+      width: 100vw;
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+
   .inner {
     display: flex;
     flex-direction: column;

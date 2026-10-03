@@ -421,4 +421,11 @@
     font-size: var(--text-sm);
     color: var(--text-faint);
   }
+
+  /* No keyboard shortcuts to show on touch screens. */
+  @media (hover: none) {
+    kbd {
+      display: none;
+    }
+  }
 </style>

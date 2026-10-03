@@ -386,4 +386,20 @@
     color: var(--text-faint);
     font-size: var(--text-sm);
   }
+
+  @media (max-width: 720px) {
+    .sidebar {
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+
+    header :global(.icon-btn:first-child) {
+      display: none;
+    }
+  }
+
+  @media (hover: none) {
+    .search .kbd {
+      display: none;
+    }
+  }
 </style>

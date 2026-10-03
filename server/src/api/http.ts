@@ -125,6 +125,25 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
 
   app.get('/api/remote', (c) => c.json(remoteStatus(svc, auth)))
 
+  /* ---------- push notifications ---------- */
+
+  const pushSub = z.object({ endpoint: z.string().url().max(2000), keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }) })
+  app.get('/api/push/key', (c) => c.json({ publicKey: svc.push!.publicKey() }))
+  app.post('/api/push/subscribe', async (c) => {
+    svc.push!.subscribe(deviceOf.get(c.req.raw) ?? null, await body(c, pushSub))
+    return c.body(null, 204)
+  })
+  app.post('/api/push/unsubscribe', async (c) => {
+    svc.push!.unsubscribe((await body(c, z.object({ endpoint: z.string().max(2000) }))).endpoint)
+    return c.body(null, 204)
+  })
+  app.post('/api/push/test', async (c) => {
+    const b = await body(c, z.object({ endpoint: z.string().max(2000) }))
+    const sent = await svc.push!.send({ title: 'Ant', body: 'Notifications work on this device.', url: '/' }, [b.endpoint])
+    if (!sent) throw new HttpError(502, 'The push service refused the test notification')
+    return c.body(null, 204)
+  })
+
   app.post('/api/remote/tailscale', async (c) => {
     if (!auth.trusted(c)) throw new HttpError(403, 'Change remote access from the computer Ant runs on')
     const b = await body(c, z.object({ enabled: z.boolean() }))
@@ -570,7 +589,20 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     upgradeWebSocket((c) => {
       const deviceId = deviceOf.get(c.req.raw)
       let off: (() => void) | null = null
+      let visible = false
+      const setVisible = (v: boolean) => {
+        if (v !== visible) svc.visibleClients += v ? 1 : -1
+        visible = v
+      }
       return {
+        onMessage(e) {
+          try {
+            const m = JSON.parse(String(e.data)) as { type?: string; visible?: unknown }
+            if (m.type === 'presence') setVisible(m.visible === true)
+          } catch {
+            // ignore malformed frames
+          }
+        },
         onOpen(_e, ws) {
           const send = (e: AntEvent) => ws.send(JSON.stringify(e))
           svc.bus.on('event', send)
@@ -578,6 +610,7 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
           off = () => {
             svc.bus.off('event', send)
             untrack()
+            setVisible(false)
           }
         },
         onClose() {
@@ -620,4 +653,5 @@ const MIME: Record<string, string> = {
   '.woff': 'font/woff',
   '.png': 'image/png',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
 }

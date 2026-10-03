@@ -20,11 +20,13 @@
     "discord.js": "^14.27.0",
     "grammy": "^1.46.0",
     "hono": "^4.13.12",
+    "web-push": "^3.6.7",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3"

@@ -18,6 +18,8 @@ export interface Notice {
 
 export const app = $state({
   mode: 'connecting' as Mode,
+  /** Phone layout: the chat screen is showing (otherwise the ant list). */
+  mobileChat: false,
   online: true,
   user: { name: 'Leon', plan: 'Pro' },
   ants: [] as Ant[],
@@ -152,6 +154,20 @@ async function resync() {
 
 let stopEvents: (() => void) | null = null
 
+/** Notification taps open /?thread=<id>: show that chat. */
+function openFromUrl(href: string) {
+  const id = new URL(href).searchParams.get('thread')
+  if (!id) return
+  history.replaceState(null, '', location.pathname)
+  if (threadById(id)) select(id)
+}
+
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type === 'open' && typeof e.data.url === 'string') openFromUrl(e.data.url)
+  })
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('ant:unpaired', () => {
     stopEvents?.()
@@ -164,6 +180,7 @@ export async function init() {
   try {
     await resync()
     app.mode = 'live'
+    openFromUrl(location.href)
     refreshSkills()
     stopEvents?.()
     stopEvents = connectEvents(
@@ -371,6 +388,7 @@ export function select(id: string) {
   if (!t) return
   const changedAnt = skillAnt(t) !== skillAnt(threadById(app.selectedId))
   app.selectedId = id
+  app.mobileChat = true
   if (changedAnt) refreshSkills()
   app.takeover = false
   if (t.unread) {
