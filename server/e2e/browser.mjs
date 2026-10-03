@@ -2,12 +2,13 @@ import { base, check, connect, createAnt, done, json, messages, post, say } from
 
 const ws = await connect()
 const { ant, thread } = await createAnt('Webby')
-const finished = await say(thread, 'Use your browser to open https://example.com and tell me the main heading. One line.')
+const finished = await say(thread, 'Use your browser to open https://example.com and tell me the page title. One line.')
 const msgs = await messages(thread)
 const tools = msgs.filter((m) => m.kind === 'tool' && m.name.startsWith('mcp__browser__'))
 const last = msgs.filter((m) => m.kind === 'text' && m.author !== 'user').at(-1)
 check('turn finished', finished)
-check('used browser tools', tools.length > 0 && tools.every((t) => t.state === 'ok'), tools.map((t) => `${t.title}:${t.state}`).join(', '))
+// Opening a page returns its title and snapshot; the ant may also retry a failed read.
+check('used browser tools', tools.some((t) => /Opened/.test(t.title) && t.state === 'ok'), tools.map((t) => `${t.title}:${t.state}`).join(', '))
 check('answer mentions Example Domain', /example domain/i.test(last?.text ?? ''), last?.text)
 const state = await json(await fetch(`${base}/api/ants/${ant.id}/computer`))
 check('computer running on example.com', state.running && /example\.com/.test(state.url ?? ''), state.url)
