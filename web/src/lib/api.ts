@@ -1,5 +1,5 @@
 // Client for antd: REST calls and the live event stream.
-import type { ChannelStatus, ConnectorsView } from '@ant/shared'
+import type { ActivityView, ChannelStatus, ConnectorsView } from '@ant/shared'
 import type { AntEvent, ApprovalDecision, Bootstrap, Colony, ComputerState, CreateAntInput, CreateRoutineInput, Message, RoutineRunView, RoutineView, RuleView, SearchHit, Settings, SkillView } from '@ant/shared'
 
 export type RoutinePatch = Partial<Pick<RoutineView, 'name' | 'instruction' | 'when' | 'tz' | 'enabled' | 'event'>>
@@ -46,6 +46,7 @@ export interface RemoteView {
 
 export const api = {
   answerSecret: (messageId: string, value: string | null) => req<void>('POST', `/api/messages/${messageId}/secret`, value === null ? { decline: true } : { value }),
+  activity: () => req<ActivityView>('GET', '/api/activity'),
   authStatus: () => req<{ trusted: boolean; authenticated: boolean; device: { id: string; name: string } | null }>('GET', '/api/auth/status'),
   pair: (code: string, name: string) => req<{ device: { id: string; name: string } }>('POST', '/api/auth/pair', { code, name }),
   logout: () => req<void>('POST', '/api/auth/logout'),

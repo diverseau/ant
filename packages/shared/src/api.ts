@@ -83,6 +83,26 @@ export type EventSpec =
 
 export type GitHubEvent = 'issue.opened' | 'pr.opened' | 'pr.merged' | 'push' | 'comment' | 'release'
 
+export interface ActivityView {
+  /** Ants in the middle of a turn right now. */
+  working: Array<{ antId: string; threadId: string; source: string; status: string | null; startedAt: number }>
+  /** Approvals and hand-offs waiting on the user. */
+  waiting: Array<{ antId: string; threadId: string; messageId: string | null; action: string; behaviour: string; createdAt: number }>
+  /** Finished turns, newest first. */
+  recent: Array<{
+    id: string
+    antId: string
+    threadId: string | null
+    trigger: 'user' | 'ant' | 'routine' | 'webhook' | 'channel'
+    status: 'succeeded' | 'failed' | 'stopped'
+    startedAt: number
+    endedAt: number | null
+    costUsd: number
+    routine: string | null
+    summary: string
+  }>
+}
+
 export interface RoutineRunView {
   id: string
   routineId: string

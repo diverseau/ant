@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ActivityIcon from '@lucide/svelte/icons/activity'
   import Pin from '@lucide/svelte/icons/pin'
   import PinOff from '@lucide/svelte/icons/pin-off'
   import Pencil from '@lucide/svelte/icons/pencil'
@@ -12,7 +13,7 @@
   import { flip } from 'svelte/animate'
   import { Spring } from 'svelte/motion'
   import { mod } from '../../lib/format'
-  import { collapse, rise } from '../../lib/motion'
+  import { collapse, rise, pop } from '../../lib/motion'
   import { app, deleteThread, select, sortedThreads, togglePin } from '../../lib/store.svelte'
   import Menu, { type MenuItem } from '../../lib/ui/Menu.svelte'
   import UsageRing from '../../lib/ui/UsageRing.svelte'
@@ -97,6 +98,9 @@
       ],
     }
   }
+
+  // Approvals and hand-offs still open, across every chat.
+  const waitingCount = $derived(app.threads.reduce((n, t) => n + t.messages.filter((m) => m.kind === 'approval' && !m.decision).length, 0))
 </script>
 
 <aside class="sidebar" class:collapsed={app.sidebarCollapsed}>
@@ -169,6 +173,12 @@
   </div>
 
   <footer>
+    {#if app.mode === 'live'}
+      <button class="nav" title="Activity" onclick={() => (app.overlay = 'activity')}>
+        <span class="nav-icon"><ActivityIcon size={16} />{#if waitingCount}<span class="dot-badge" in:pop>{waitingCount}</span>{/if}</span>
+        {#if !app.sidebarCollapsed}<span>Activity</span>{/if}
+      </button>
+    {/if}
     <button class="nav" title="Connectors" onclick={() => (app.overlay = 'connectors')}>
       <Plug size={16} />
       {#if !app.sidebarCollapsed}<span>Connectors</span>{/if}
@@ -401,5 +411,26 @@
     .search .kbd {
       display: none;
     }
+  }
+
+  .nav-icon {
+    position: relative;
+    display: grid;
+  }
+
+  .dot-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: var(--r-full);
+    background: var(--warn);
+    color: #141413;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 15px;
+    text-align: center;
   }
 </style>

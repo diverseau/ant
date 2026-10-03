@@ -21,6 +21,7 @@ All notable changes to Ant. Versions follow [Semantic Versioning](https://semver
 - Secure secret card: an ant calls `request_secret`; you paste the value into a write-only card, it's stored encrypted and given to that ant as an environment variable on a fresh process, never as chat text.
 - Rule editor (Details → Rules): "When <ant> wants to send email / post in Slack / change my calendar / use a connector / open a site / run a command / edit files → Allow, Ask first, Hand off or Never", per ant or for all ants. Enforced by Ant's hook on every tool call, so it holds in every permission mode. Plain-language instructions are written into the ant's CLAUDE.md.
 - Skill manager (Details → Skills): open any skill to read or edit it, write new ones from a template, share an ant's skill with every ant, use it now, or delete it. Saved skills are linted and safety-scanned like `save_skill`.
+- Activity view (sidebar → Activity): what every ant is doing now, what's waiting on you (with a badge), scheduled and event routines, and recent runs with their outcome, routine and cost. Tap anything to open that chat.
 - Refresh button in the usage panel. It runs Claude Code's local `/usage` command (no model call, no usage spent) and updates both windows.
 
 ### Security

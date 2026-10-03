@@ -11,6 +11,7 @@
   import FileViewer from './lib/ui/FileViewer.svelte'
   import Settings from './features/settings/Settings.svelte'
   import Pair from './features/auth/Pair.svelte'
+  import Activity from './features/activity/Activity.svelte'
   import { app, init, select, selectRelative, sortedThreads, togglePanel } from './lib/store.svelte'
 
   init()
@@ -118,6 +119,8 @@
   <Connectors />
 {:else if app.overlay === 'settings'}
   <Settings />
+{:else if app.overlay === 'activity'}
+  <Activity />
 {:else if app.overlay === 'usage'}
   <UsagePanel />
 {/if}

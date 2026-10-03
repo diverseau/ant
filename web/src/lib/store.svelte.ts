@@ -5,7 +5,7 @@ import { respond, stop as stopEngine } from './mock/engine'
 import type { Accessory, Ant, AntColor, ApprovalMessage, DraftMessage, Message, Thread } from './types'
 
 export type Panel = 'computer' | 'details' | null
-export type Overlay = 'palette' | 'new-ant' | 'new-colony' | 'connectors' | 'usage' | 'settings' | null
+export type Overlay = 'palette' | 'new-ant' | 'new-colony' | 'connectors' | 'usage' | 'settings' | 'activity' | null
 /** `live` talks to antd; `demo` runs the scripted mock when antd isn't reachable; `pair` is a
  * device antd doesn't know yet (opened from a phone or another computer). */
 export type Mode = 'connecting' | 'live' | 'demo' | 'pair'

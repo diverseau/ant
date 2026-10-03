@@ -16,6 +16,7 @@ import * as R from '../db/repos/index.ts'
 import { toMessage } from '../mappers.ts'
 import { HttpError, type AntService } from '../service.ts'
 import { probeUsage } from '../usage/probe.ts'
+import { activity } from '../activity.ts'
 import { Auth, LOCAL_HOSTS, SESSION_COOKIE, hostOf } from '../auth/auth.ts'
 import { remoteStatus, setTailscale } from '../auth/remote.ts'
 import { deleteCookie, setCookie } from 'hono/cookie'
@@ -655,6 +656,8 @@ export function startHttp(svc: AntService, broker: Broker, scheduler: Scheduler,
     if (!png) return c.body(null, 404, { 'cache-control': 'no-store' })
     return c.body(new Uint8Array(png), 200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=604800' })
   })
+
+  app.get('/api/activity', (c) => c.json(activity(svc)))
 
   app.get('/api/usage', (c) => {
     const to = new Date().toISOString().slice(0, 10)

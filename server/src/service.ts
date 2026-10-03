@@ -71,6 +71,11 @@ export class AntService {
   private queues = new Map<string, Turn[]>()
   private loopGuard = new LoopGuard()
   private activity = new Map<string, string>()
+
+  /** Live status lines ants have set with set_status, for the Activity view. */
+  activityOf(antId: string): string | undefined {
+    return this.activity.get(antId)
+  }
   readonly computers: ComputerManager
   readonly skills: SkillRegistry
   /** Set by main.ts; connectors and secrets. */
@@ -539,6 +544,7 @@ export class AntService {
       startedAt: Date.now(),
     })
     l.runId = run.id
+    if (turn.routineRunId) this.db.prepare('UPDATE routine_runs SET run_id = ? WHERE id = ?').run(run.id, turn.routineRunId)
     this.setStatus(antId, 'working')
     this.emit({ type: 'typing', threadId: turn.threadId, antId })
     try {
